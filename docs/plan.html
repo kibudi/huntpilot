@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>huntpilot — the plan</title>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css">
+
+  <style>
+    :root {
+      --accent: #6ea8fe;
+      --good: #22c55e;
+      --warn: #f59e0b;
+    }
+
+    .reveal { font-size: 30px; }
+    .reveal h1, .reveal h2, .reveal h3 { text-transform: none; letter-spacing: -0.02em; }
+    .reveal h1 { font-size: 2.4em; }
+    .reveal h2 { font-size: 1.5em; margin-bottom: .6em; }
+    .reveal section { text-align: left; }
+    .reveal section.center { text-align: center; }
+
+    .reveal .accent { color: var(--accent); }
+    .reveal .muted  { color: #8b94a3; }
+    .reveal .good   { color: var(--good); }
+    .reveal .warn   { color: var(--warn); }
+
+    .reveal table { font-size: .62em; }
+    .reveal table th {
+      color: var(--accent);
+      text-transform: uppercase;
+      font-size: .8em;
+      letter-spacing: .06em;
+    }
+    .reveal table td, .reveal table th { padding: .3em .7em; }
+
+    .reveal pre {
+      box-shadow: none;
+      width: 100%;
+      font-size: .5em;
+    }
+    .reveal pre code {
+      background: #14161a;
+      border: 1px solid #2a2f38;
+      border-radius: 8px;
+      padding: 1em;
+      max-height: none;
+    }
+
+    .reveal ul { margin-bottom: .8em; }
+    .reveal li { margin: .35em 0; }
+
+    .lead {
+      font-size: 1.15em;
+      line-height: 1.4;
+    }
+
+    .pipeline {
+      display: flex;
+      gap: .5em;
+      flex-wrap: wrap;
+      margin: .8em 0;
+    }
+    .pipeline .step {
+      flex: 1 1 0;
+      min-width: 5em;
+      border: 1px solid #2a2f38;
+      border-radius: 8px;
+      padding: .5em;
+      text-align: center;
+      font-size: .62em;
+      background: #1b1e24;
+    }
+    .pipeline .step b { display: block; color: var(--accent); }
+
+    .status-done   { color: var(--good); }
+    .status-now    { color: var(--warn); }
+    .status-todo   { color: #6b7280; }
+
+    .footnote {
+      font-size: .6em;
+      color: #8b94a3;
+      margin-top: 1.2em;
+    }
+  </style>
+</head>
+<body>
+<div class="reveal">
+  <div class="slides">
+
+    <section class="center">
+      <h1 class="accent">huntpilot</h1>
+      <p class="lead">A job-application tracker —<br>and an excuse to learn DevOps properly.</p>
+      <p class="footnote">Use ← → to navigate · <b>Esc</b> for overview</p>
+    </section>
+
+    <section>
+      <h2>The problem</h2>
+      <p class="lead">Job hunting is a pipeline, and everyone tracks it in a spreadsheet they stop updating after two weeks.</p>
+      <ul>
+        <li>Where did I apply, and when?</li>
+        <li>Which ones have gone quiet and need a follow-up?</li>
+        <li>What's actually worth applying to today?</li>
+      </ul>
+      <p class="footnote">Solving it for myself. If it's genuinely useful, I'll actually keep using it — which is the only way the project survives past week one.</p>
+    </section>
+
+    <section>
+      <h2>What it is</h2>
+      <p><span class="accent">One backend, two ways in.</span></p>
+      <ul>
+        <li><b>Web dashboard</b> — the full picture. Table of every application, status, notes, outcomes.</li>
+        <li><b>Discord bot</b> — the daily driver. <code>/jobs new</code> to see fresh matches, <code>/apply</code> to log one, and it DMs me when something's gone quiet.</li>
+        <li><b>Background worker</b> — polls job boards on a schedule, queues new matches, fires the follow-up reminders.</li>
+      </ul>
+      <p class="footnote">The bot is what makes it stick. Opening a dashboard is a chore; replying to a DM isn't.</p>
+    </section>
+
+    <section>
+      <h2>Why this project</h2>
+      <ul>
+        <li>Real reason to run <span class="accent">more than one service</span> — so containers and orchestration aren't decoration.</li>
+        <li>Real reason to have a <span class="accent">queue and a scheduler</span> — polling job boards is genuinely async work.</li>
+        <li>Frontend, backend, database, infra — <span class="accent">the whole stack</span>, end to end.</li>
+        <li>It's a portfolio piece <span class="muted">about</span> job hunting, built <span class="muted">while</span> job hunting.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Architecture</h2>
+      <pre><code>              ┌─────────────┐     ┌─────────────┐
+              │  web (React)│     │ bot (Discord)│
+              └──────┬──────┘     └──────┬──────┘
+                     │  HTTP             │  HTTP
+                     └─────────┬─────────┘
+                               ▼
+                        ┌─────────────┐
+                        │ api(FastAPI)│──────┐
+                        └──────┬──────┘      │ enqueue
+                               │ SQL         ▼
+                               ▼         ┌────────┐
+                        ┌───────────┐    │ redis  │
+                        │ postgres  │    └────┬───┘
+                        └───────────┘         │ consume
+                               ▲              ▼
+                               │        ┌─────────────┐
+                               └────────│ worker      │
+                                  SQL   │ (Celery+Beat)│
+                                        └─────────────┘</code></pre>
+      <p class="footnote"><code>api</code> is the only service that touches Postgres. Everything else goes through it.</p>
+    </section>
+
+    <section>
+      <h2>The data model</h2>
+      <p class="footnote" style="margin-top:0">Pinned first — it's the contract the DB, the API, the dashboard and the bot all agree on.</p>
+      <table>
+        <tr><th>field</th><th>type</th><th>notes</th></tr>
+        <tr><td>company / role / location</td><td>string</td><td></td></tr>
+        <tr><td>source</td><td>string</td><td>LinkedIn, RemoteOK, referral…</td></tr>
+        <tr><td>url</td><td>string</td><td>link to the posting</td></tr>
+        <tr><td>status</td><td>enum</td><td>saved → applied → interview → closed</td></tr>
+        <tr><td>applied_date</td><td>date?</td><td>null while still saved</td></tr>
+        <tr><td>outcome</td><td>enum?</td><td>offer / rejected / <span class="muted">ghosted</span></td></tr>
+        <tr><td>notes</td><td>text</td><td></td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>Stack</h2>
+      <table>
+        <tr><th>layer</th><th>choice</th></tr>
+        <tr><td>Backend</td><td>FastAPI + SQLAlchemy 2.0 + Alembic, <code>uv</code></td></tr>
+        <tr><td>Database</td><td>Postgres 16</td></tr>
+        <tr><td>Worker</td><td>Celery + Beat, Redis 7</td></tr>
+        <tr><td>Bot</td><td>discord.py</td></tr>
+        <tr><td>Frontend</td><td>React + Vite + TypeScript + Tailwind</td></tr>
+        <tr><td>Containers</td><td>Docker + Compose</td></tr>
+        <tr><td>Orchestration</td><td>kind <span class="muted">(Kubernetes in Docker)</span></td></tr>
+        <tr><td>CI/CD</td><td>GitHub Actions</td></tr>
+        <tr><td>IaC</td><td>Terraform + LocalStack</td></tr>
+      </table>
+    </section>
+
+    <section>
+      <h2>The DevOps half</h2>
+      <p>The actual point of the project.</p>
+      <ul>
+        <li><b class="accent">Containers</b> — each service in its own image, Compose to wire them locally.</li>
+        <li><b class="accent">Orchestration</b> — real Kubernetes on <code>kind</code>: Deployments, Services, ConfigMaps, Secrets, and an HPA scaling the worker on queue depth.</li>
+        <li><b class="accent">CI/CD</b> — GitHub Actions: lint and test on PR, build and push images on merge.</li>
+        <li><b class="accent">IaC</b> — Terraform: modules, state, providers. Applied against LocalStack.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2 class="good">Cost: $0</h2>
+      <p>Every layer has a free local equivalent. The trick is knowing which one.</p>
+      <table>
+        <tr><th>instead of</th><th>use</th><th></th></tr>
+        <tr><td>EKS <span class="warn">(~$73/mo)</span></td><td><code>kind</code></td><td class="muted">real K8s, in Docker</td></tr>
+        <tr><td>RDS</td><td>Postgres container</td><td class="muted">same engine</td></tr>
+        <tr><td>Live AWS in Terraform</td><td>LocalStack</td><td class="muted">real HCL, fake cloud</td></tr>
+        <tr><td>Hosted runners <span class="muted">at scale</span></td><td>GitHub free tier</td><td class="muted">plenty here</td></tr>
+      </table>
+      <p class="footnote">Stretch goal: one real Terraform apply against free-tier-safe AWS (S3 + ECR + IAM), screenshot it, <code>terraform destroy</code>.</p>
+    </section>
+
+    <section>
+      <h2>Build order</h2>
+      <div class="pipeline">
+        <div class="step"><b>1</b> FastAPI + Postgres</div>
+        <div class="step"><b>2</b> React dashboard</div>
+        <div class="step"><b>3</b> Discord bot</div>
+        <div class="step"><b>4</b> Celery worker</div>
+        <div class="step"><b>5</b> Docker Compose</div>
+        <div class="step"><b>6</b> kind + K8s</div>
+        <div class="step"><b>7</b> Actions CI/CD</div>
+        <div class="step"><b>8</b> Terraform</div>
+      </div>
+      <p>One step at a time. Each one runs before the next one starts.</p>
+      <p class="footnote">Deliberately app-first: containerising something that doesn't work yet just hides the bugs.</p>
+    </section>
+
+    <section>
+      <h2>Where we are</h2>
+      <ul>
+        <li><span class="status-done">✓</span> Repo, stack and conventions locked in <code>CLAUDE.md</code></li>
+        <li><span class="status-done">✓</span> Data model pinned</li>
+        <li><span class="status-done">✓</span> This deck</li>
+        <li><span class="status-now">▸</span> <b>Step 1</b> — FastAPI + Postgres, <code>GET /api/applications</code></li>
+        <li><span class="status-todo">·</span> Step 2 — React + Vite dashboard against that API</li>
+      </ul>
+      <p class="footnote">This deck lives at <code>docs/plan.html</code> and gets updated as steps land.</p>
+    </section>
+
+    <section class="center">
+      <h2 class="accent">Step 1 next:</h2>
+      <p class="lead">the API.</p>
+    </section>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+  Reveal.initialize({ hash: true, slideNumber: 'c/t', transition: 'slide' });
+</script>
+</body>
+</html>
