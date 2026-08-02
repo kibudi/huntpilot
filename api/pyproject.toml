@@ -5,6 +5,9 @@ description = "huntpilot API — owns the database"
 requires-python = ">=3.12"
 dependencies = [
     "beanie>=1.27",
+    "fastapi>=0.141.1",
+    "pydantic-settings>=2.14.2",
+    "uvicorn[standard]>=0.52.1",
 ]
 
 [dependency-groups]
