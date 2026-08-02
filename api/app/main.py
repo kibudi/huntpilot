@@ -2,12 +2,13 @@
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from http import HTTPStatus
 
 from fastapi import FastAPI
 
 from app.db import init_db
 from app.models import Application
-from app.schemas import ApplicationRead
+from app.schemas import ApplicationCreate, ApplicationRead
 
 
 @asynccontextmanager
@@ -46,3 +47,14 @@ async def list_applications() -> list[ApplicationRead]:
     """
     documents = await Application.find_all().sort("-updated_at").to_list()
     return [ApplicationRead.model_validate(document) for document in documents]
+
+
+@app.post("/api/applications", status_code=HTTPStatus.CREATED)
+async def create_application(payload: ApplicationCreate) -> ApplicationRead:
+    """Tracks a new application and returns it as stored.
+
+    The stored document is returned rather than the payload, so the caller receives the server's
+    identifier and timestamps without having to re-read.
+    """
+    document = await Application(**payload.model_dump()).insert()
+    return ApplicationRead.model_validate(document)
