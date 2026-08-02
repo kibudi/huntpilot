@@ -140,17 +140,17 @@
                         ┌─────────────┐
                         │ api(FastAPI)│──────┐
                         └──────┬──────┘      │ enqueue
-                               │ SQL         ▼
+                               │ Beanie      ▼
                                ▼         ┌────────┐
-                        ┌───────────┐    │ redis  │
-                        │ postgres  │    └────┬───┘
-                        └───────────┘         │ consume
+                     ┌──────────────┐    │ redis  │
+                     │ MongoDB Atlas│    └────┬───┘
+                     └──────────────┘         │ consume
                                ▲              ▼
                                │        ┌─────────────┐
                                └────────│ worker      │
-                                  SQL   │ (Celery+Beat)│
+                              Beanie    │ (Celery+Beat)│
                                         └─────────────┘</code></pre>
-      <p class="footnote"><code>api</code> is the only service that touches Postgres. Everything else goes through it.</p>
+      <p class="footnote"><code>api</code> is the only service that touches MongoDB. Everything else goes through it.</p>
     </section>
 
     <section>
@@ -172,8 +172,8 @@
       <h2>Stack</h2>
       <table>
         <tr><th>layer</th><th>choice</th></tr>
-        <tr><td>Backend</td><td>FastAPI + SQLAlchemy 2.0 + Alembic, <code>uv</code></td></tr>
-        <tr><td>Database</td><td>Postgres 16</td></tr>
+        <tr><td>Backend</td><td>FastAPI + Beanie ODM, <code>uv</code></td></tr>
+        <tr><td>Database</td><td>MongoDB Atlas <span class="muted">(M0 free tier)</span></td></tr>
         <tr><td>Worker</td><td>Celery + Beat, Redis 7</td></tr>
         <tr><td>Bot</td><td>discord.py</td></tr>
         <tr><td>Frontend</td><td>React + Vite + TypeScript + Tailwind</td></tr>
@@ -201,7 +201,7 @@
       <table>
         <tr><th>instead of</th><th>use</th><th></th></tr>
         <tr><td>EKS <span class="warn">(~$73/mo)</span></td><td><code>kind</code></td><td class="muted">real K8s, in Docker</td></tr>
-        <tr><td>RDS</td><td>Postgres container</td><td class="muted">same engine</td></tr>
+        <tr><td>DocumentDB</td><td>Atlas M0</td><td class="muted">free forever, 512 MB</td></tr>
         <tr><td>Live AWS in Terraform</td><td>LocalStack</td><td class="muted">real HCL, fake cloud</td></tr>
         <tr><td>Hosted runners <span class="muted">at scale</span></td><td>GitHub free tier</td><td class="muted">plenty here</td></tr>
       </table>
@@ -211,7 +211,7 @@
     <section>
       <h2>Build order</h2>
       <div class="pipeline">
-        <div class="step"><b>1</b> FastAPI + Postgres</div>
+        <div class="step"><b>1</b> FastAPI + MongoDB</div>
         <div class="step"><b>2</b> React dashboard</div>
         <div class="step"><b>3</b> Discord bot</div>
         <div class="step"><b>4</b> Celery worker</div>
@@ -230,7 +230,8 @@
         <li><span class="status-done">✓</span> Repo, stack and conventions locked in <code>CLAUDE.md</code></li>
         <li><span class="status-done">✓</span> Data model pinned</li>
         <li><span class="status-done">✓</span> This deck</li>
-        <li><span class="status-now">▸</span> <b>Step 1</b> — FastAPI + Postgres, <code>GET /api/applications</code></li>
+        <li><span class="status-done">✓</span> Beanie <code>Application</code> document, verified against Atlas</li>
+        <li><span class="status-now">▸</span> <b>Step 1</b> — FastAPI, <code>GET /api/applications</code></li>
         <li><span class="status-todo">·</span> Step 2 — React + Vite dashboard against that API</li>
       </ul>
       <p class="footnote">This deck lives at <code>docs/plan.html</code> and gets updated as steps land.</p>

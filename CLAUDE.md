@@ -16,9 +16,12 @@ Learning project — the DevOps layers matter as much as the app. Runs locally, 
 
 ## Stack
 
-FastAPI · SQLAlchemy 2.0 · Alembic · `uv` · Postgres 16 · Celery + Redis 7 · `discord.py` ·
-React + Vite + TypeScript + Tailwind · `pytest` · `ruff` · Docker + Compose · `kind` ·
+FastAPI · MongoDB Atlas (M0 free tier) · Beanie ODM · `uv` · Celery + Redis 7 · `discord.py` ·
+React + Vite + TypeScript + Tailwind · `pytest` · `ruff` · `mypy` · Docker + Compose · `kind` ·
 GitHub Actions · Terraform (LocalStack; real AWS only for free-tier-safe S3/ECR/IAM)
+
+MongoDB replaced Postgres/SQLAlchemy/Alembic. There is no migrations layer — Mongo is schemaless,
+so document shape is enforced by Beanie's Pydantic validation, not by the database.
 
 ## Layout
 
@@ -31,7 +34,12 @@ bot/      discord.py slash commands       (not built yet)
 infra/    Dockerfiles, k8s/, terraform/   (not built yet)
 ```
 
-`api/` is the only service that touches Postgres. `web/` and `bot/` go through the API.
+`api/` is the only service that touches MongoDB. `web/` and `bot/` go through the API.
+
+## Configuration
+
+`.env` at the repo root holds `MONGODB_URI` and `MONGODB_DB`. It is gitignored; `.env.example` is
+the committed template. Never write real credentials into any tracked file.
 
 ## Commands
 
@@ -44,6 +52,9 @@ uv run pytest           # tests (none yet)
 ```
 
 The venv lives at `api/.venv`; `.vscode/settings.json` points the editor at it.
+
+Beanie documents cannot be instantiated before `init_beanie()` runs, so model tests need a live
+MongoDB — there is no in-memory equivalent. Point tests at a throwaway database and drop it after.
 
 Open `docs/plan.html` in a browser to review the plan. This section grows as services land.
 
