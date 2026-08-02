@@ -7,6 +7,7 @@ from fastapi import FastAPI
 
 from app.db import init_db
 from app.models import Application
+from app.schemas import ApplicationRead
 
 
 @asynccontextmanager
@@ -33,11 +34,15 @@ async def health() -> dict[str, str]:
 
 
 @app.get("/api/applications")
-async def list_applications() -> list[Application]:
+async def list_applications() -> list[ApplicationRead]:
     """Returns every tracked application, most recently updated first.
+
+    Documents are converted to the response schema explicitly rather than returned raw, so the
+    JSON and the OpenAPI description both describe the wire format instead of the stored one.
 
     The sort key is given as a string rather than ``-Application.updated_at`` because the operator
     form is not expressible in the type system: the attribute is annotated ``datetime``, which has
     no unary minus.
     """
-    return await Application.find_all().sort("-updated_at").to_list()
+    documents = await Application.find_all().sort("-updated_at").to_list()
+    return [ApplicationRead.model_validate(document) for document in documents]
