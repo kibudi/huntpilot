@@ -4,8 +4,10 @@ version = "0.1.0"
 description = "huntpilot API — owns the database"
 requires-python = ">=3.12"
 dependencies = [
-    "sqlalchemy>=2.0",
-    "psycopg[binary]>=3.2",
+    "beanie>=1.27",
+    "fastapi>=0.141.1",
+    "pydantic-settings>=2.14.2",
+    "uvicorn[standard]>=0.52.1",
 ]
 
 [dependency-groups]
@@ -13,6 +15,8 @@ dev = [
     "pytest>=8.3",
     "ruff>=0.8",
     "mypy>=1.13",
+    "pytest-asyncio>=1.4.0",
+    "httpx>=0.28.1",
 ]
 
 [tool.uv]
@@ -25,6 +29,9 @@ strict = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+# Without "auto" every async test needs an explicit @pytest.mark.asyncio or it fails outright.
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.ruff]
 line-length = 100

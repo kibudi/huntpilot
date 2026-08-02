@@ -12,7 +12,6 @@ venv/
 # Secrets
 .env
 .env.*
-!.env.example
 
 # Node (frontend, later)
 node_modules/
@@ -22,3 +21,6 @@ dist/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Agent instructions, kept local
+CLAUDE.md

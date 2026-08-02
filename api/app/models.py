@@ -1,19 +1,22 @@
-"""SQLAlchemy models for huntpilot."""
+"""MongoDB documents for huntpilot."""
 
-from datetime import date
+from datetime import UTC, date, datetime
 from enum import StrEnum
 
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+import pymongo
+from beanie import Document
+from pydantic import Field
 
 
-class Base(DeclarativeBase):
-    """Declarative base for all huntpilot tables."""
+def _now() -> datetime:
+    """Returns the current time as a timezone-aware UTC timestamp."""
+    return datetime.now(UTC)
 
 
 class Status(StrEnum):
     """Where an application sits in the pipeline.
 
-    Outcomes are pipeline states rather than a separate column, so an application cannot claim an
+    Outcomes are pipeline states rather than a separate field, so an application cannot claim an
     outcome it hasn't reached. Declaration order is pipeline order.
     """
 
@@ -24,18 +27,35 @@ class Status(StrEnum):
     REJECTED = "rejected"
     GHOSTED = "ghosted"
 
+class Application(Document):
+    """A single job application being tracked.
 
-class Application(Base):
-    """A single job application being tracked."""
+    Beanie supplies the ``id`` field, so it is not declared here.
 
-    __tablename__ = "applications"
+    The timestamps are the sort keys the dashboard and bot order by: ``created_at`` for when a job
+    was first saved, ``updated_at`` for the last time anything about it moved. Both are indexed
+    descending, which is the direction they are read in. Unlike a relational database, MongoDB has
+    no server-side default or on-update mechanism, so both are set in Python and ``updated_at``
+    must be refreshed by whoever saves the document.
+    """
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    company: Mapped[str]
-    role: Mapped[str]
-    location: Mapped[str]
-    source: Mapped[str]
-    url: Mapped[str]
-    status: Mapped[Status]
-    applied_date: Mapped[date | None]
-    notes: Mapped[str]
+    company: str
+    role: str
+    location: str
+    source: str
+    url: str
+    status: Status = Status.SAVED
+    applied_date: date | None = None
+    notes: str = ""
+    created_at: datetime = Field(default_factory=_now)
+    updated_at: datetime = Field(default_factory=_now)
+
+    class Settings:
+        """Collection name and the indexes backing the sort keys."""
+
+        name = "applications"
+        indexes = [
+            [("created_at", pymongo.DESCENDING)],
+            [("updated_at", pymongo.DESCENDING)],
+            [("applied_date", pymongo.DESCENDING)],
+        ]
