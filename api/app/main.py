@@ -2,9 +2,10 @@
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from http import HTTPStatus
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 
 from app.db import init_db
 from app.models import Application
@@ -53,8 +54,20 @@ async def list_applications() -> list[ApplicationRead]:
 async def create_application(payload: ApplicationCreate) -> ApplicationRead:
     """Tracks a new application and returns it as stored.
 
-    The stored document is returned rather than the payload, so the caller receives the server's
-    identifier and timestamps without having to re-read.
+    The document is re-read before being returned rather than serialised from memory. BSON stores
+    milliseconds while Python holds microseconds, so the in-memory object does not match what a
+    later read will produce, and a client comparing the two would see them differ.
+
+    Both timestamps are set from one instant rather than left to their separate defaults, so a
+    never-modified document satisfies ``created_at == updated_at``. Two independent calls can fall
+    either side of a millisecond boundary and break that.
+
+    Raises:
+        HTTPException: 404 if the document cannot be read back, which should not occur.
     """
-    document = await Application(**payload.model_dump()).insert()
-    return ApplicationRead.model_validate(document)
+    now = datetime.now(UTC)
+    document = await Application(**payload.model_dump(), created_at=now, updated_at=now).insert()
+    stored = await Application.get(document.id)
+    if stored is None:
+        raise HTTPException(HTTPStatus.NOT_FOUND, "Application disappeared after creation")
+    return ApplicationRead.model_validate(stored)

@@ -65,16 +65,19 @@ async def test_rejects_server_owned_fields(
     assert await Application.find_all().count() == 0
 
 
-async def test_rejects_misspelled_field(
+async def test_rejects_unknown_field(
     api: AsyncClient, db: AsyncMongoClient[dict[str, Any]]
 ) -> None:
-    """A typo is refused rather than stored as a key nothing queries."""
-    payload = PAYLOAD | {"comapny": "Gong"}
-    del payload["company"]
+    """An unrecognised key is refused rather than stored as one nothing queries.
 
-    response = await api.post("/api/applications", json=payload)
+    Every required field is present, so the rejection can only come from ``extra="forbid"``.
+    Removing a required field as well would make this pass for the wrong reason.
+    """
+    response = await api.post("/api/applications", json=PAYLOAD | {"comapny": "Gong"})
 
     assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+    assert response.json()["detail"][0]["type"] == "extra_forbidden"
+    assert response.json()["detail"][0]["loc"] == ["body", "comapny"]
 
 
 async def test_rejects_missing_required_field(
@@ -97,6 +100,36 @@ async def test_rejects_unknown_status(
     response = await api.post("/api/applications", json=PAYLOAD | {"status": "banana"})
 
     assert response.status_code == HTTPStatus.UNPROCESSABLE_ENTITY
+
+
+async def test_response_body_matches_the_list_shape(
+    api: AsyncClient, db: AsyncMongoClient[dict[str, Any]]
+) -> None:
+    """The created body is usable without re-fetching, so it must match what the list returns."""
+    created = (await api.post("/api/applications", json=PAYLOAD)).json()
+
+    listed = (await api.get("/api/applications")).json()[0]
+
+    assert created == listed
+
+
+async def test_new_document_has_equal_timestamps(
+    api: AsyncClient, db: AsyncMongoClient[dict[str, Any]]
+) -> None:
+    """A never-modified document reports the same created_at and updated_at.
+
+    Regression test: the two fields were set by separate default calls and the body was serialised
+    from memory at microsecond precision, while MongoDB stores milliseconds. The POST body then
+    disagreed with every later read of the same record.
+    """
+    created = (await api.post("/api/applications", json=PAYLOAD)).json()
+
+    assert created["created_at"] == created["updated_at"]
+
+    listed = (await api.get("/api/applications")).json()[0]
+
+    assert listed["created_at"] == created["created_at"]
+    assert listed["updated_at"] == created["updated_at"]
 
 
 async def test_accepts_optional_fields(
