@@ -7,9 +7,9 @@ optional and forces clients into null checks that can never be true.
 """
 
 from datetime import date, datetime
-from typing import Annotated
+from typing import Annotated, ClassVar
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict
+from pydantic import BaseModel, BeforeValidator, ConfigDict, model_validator
 
 from app.models import Status
 
@@ -39,6 +39,47 @@ class ApplicationCreate(BaseModel):
     status: Status = Status.SAVED
     applied_date: date | None = None
     notes: str = ""
+
+
+class ApplicationUpdate(BaseModel):
+    """Fields a client may change on an existing application.
+
+    Every field is optional so a status can be moved without resending the rest. Only fields
+    actually present in the request body are applied — a field left out is untouched, which is
+    what distinguishes a PATCH from a replacement.
+
+    ``applied_date`` is the only field that may be set to null, to undo a date entered by mistake.
+    Sending null for any other field is rejected rather than storing a null the document cannot
+    hold.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    company: str | None = None
+    role: str | None = None
+    location: str | None = None
+    source: str | None = None
+    url: str | None = None
+    status: Status | None = None
+    applied_date: date | None = None
+    notes: str | None = None
+
+    NULLABLE_FIELDS: ClassVar[frozenset[str]] = frozenset({"applied_date"})
+
+    @model_validator(mode="after")
+    def _reject_null_on_non_nullable_fields(self) -> "ApplicationUpdate":
+        """Refuses an explicit null for any field the document stores as non-optional.
+
+        ``model_fields_set`` is what separates a field the client sent as null from one it simply
+        omitted; both look like ``None`` on the model itself.
+
+        Raises:
+            ValueError: If a non-nullable field was explicitly set to null.
+        """
+        for name in self.model_fields_set - self.NULLABLE_FIELDS:
+            if getattr(self, name) is None:
+                raise ValueError(f"{name} may not be null")
+        return self
 
 
 class ApplicationRead(BaseModel):

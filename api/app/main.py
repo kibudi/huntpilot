@@ -5,11 +5,12 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from http import HTTPStatus
 
+from beanie import PydanticObjectId
 from fastapi import FastAPI, HTTPException
 
 from app.db import init_db
 from app.models import Application
-from app.schemas import ApplicationCreate, ApplicationRead
+from app.schemas import ApplicationCreate, ApplicationRead, ApplicationUpdate
 
 
 @asynccontextmanager
@@ -71,3 +72,35 @@ async def create_application(payload: ApplicationCreate) -> ApplicationRead:
     if stored is None:
         raise HTTPException(HTTPStatus.NOT_FOUND, "Application disappeared after creation")
     return ApplicationRead.model_validate(stored)
+
+
+@app.patch("/api/applications/{application_id}")
+async def update_application(
+    application_id: PydanticObjectId, payload: ApplicationUpdate
+) -> ApplicationRead:
+    """Applies changes to one application and returns it as stored.
+
+    Only fields present in the request body are written, so omitting a field leaves it alone.
+    ``updated_at`` is bumped here because MongoDB has no on-update mechanism and Beanie does not
+    supply one; a write that skipped this would leave the sort order and the bot's staleness
+    checks wrong.
+
+    An empty body is accepted and changes nothing, including ``updated_at`` — nothing was
+    modified, so claiming otherwise would be a lie the dashboard sorts on.
+
+    Raises:
+        HTTPException: 404 if no application has this identifier.
+    """
+    changes = payload.model_dump(exclude_unset=True)
+    document = await Application.get(application_id)
+    if document is None:
+        raise HTTPException(HTTPStatus.NOT_FOUND, "Application not found")
+
+    if changes:
+        await document.set({**changes, "updated_at": datetime.now(UTC)})
+        refreshed = await Application.get(application_id)
+        if refreshed is None:
+            raise HTTPException(HTTPStatus.NOT_FOUND, "Application disappeared during update")
+        document = refreshed
+
+    return ApplicationRead.model_validate(document)
