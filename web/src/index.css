@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens from the dashboard handoff. Colours are OKLCH so the status pills can be
+ * generated from one lightness/chroma/hue pattern rather than hand-picked per state.
+ */
+@theme {
+  --color-page: oklch(15% 0.005 250);
+  --color-panel: oklch(17% 0.005 250);
+  --color-raised: oklch(20% 0.006 250);
+  --color-line: oklch(26% 0.006 250);
+  --color-line-strong: oklch(30% 0.006 250);
+  --color-ink: oklch(92% 0.004 250);
+  --color-ink-dim: oklch(65% 0.006 250);
+  --color-ink-faint: oklch(50% 0.006 250);
+  --color-accent: oklch(75% 0.16 250);
+  --color-accent-bright: oklch(82% 0.14 250);
+  --color-danger: oklch(65% 0.1 25);
+
+  --font-display: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Code", monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow-x: hidden;
+  background: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
