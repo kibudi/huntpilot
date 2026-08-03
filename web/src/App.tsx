@@ -86,14 +86,18 @@ export default function App() {
    * Moves an application to a new status.
    *
    * The change is applied locally first so the pill responds immediately, and rolled back if the
-   * write fails. Leaving `saved` with no date stamps today, since that transition is the moment
-   * the application was actually sent.
+   * write fails.
+   *
+   * Moving out of `saved` into a stage that implies the application was sent stamps today's date.
+   * `rejected` and `ghosted` are excluded: a saved posting can be abandoned without ever being
+   * applied to, and stamping those would invent history the tracker then reports as fact.
    */
   async function changeStatus(application: Application, next: Status) {
     const changes: { status: Status; applied_date?: string } = { status: next };
+    const impliesSent: Status[] = ["applied", "interview", "offer"];
     if (
       application.status === "saved" &&
-      next !== "saved" &&
+      impliesSent.includes(next) &&
       !application.applied_date
     ) {
       changes.applied_date = today();
@@ -119,6 +123,11 @@ export default function App() {
         [application.id]: { kind: "failed", message: (error as Error).message },
       }));
     }
+  }
+
+  /** Clears a row's error message, which otherwise stays pinned to the row for the whole session. */
+  function dismissError(id: string) {
+    setRowStates((current) => ({ ...current, [id]: { kind: "idle" } }));
   }
 
   /** Creates an application and puts it at the top, where the newest-updated sort would place it. */
@@ -186,6 +195,7 @@ export default function App() {
           onSortChange={setSort}
           rowStates={rowStates}
           onStatusChange={changeStatus}
+          onDismissError={dismissError}
           onAdd={() => setDialog({ kind: "open" })}
           emptyMessage={
             applications.length === 0

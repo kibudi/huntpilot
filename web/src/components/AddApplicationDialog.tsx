@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DialogState } from "../state";
 import { STATUSES, type ApplicationCreate, type Status } from "../types";
 
@@ -13,12 +13,13 @@ const BLANK = {
   notes: "",
 };
 
-const REQUIRED: (keyof typeof BLANK)[] = [
-  "company",
-  "role",
-  "location",
-  "source",
-  "url",
+/** Required fields, with the labels the form shows, so a validation message names what the user sees. */
+const REQUIRED: { field: keyof typeof BLANK; label: string }[] = [
+  { field: "company", label: "Company" },
+  { field: "role", label: "Role" },
+  { field: "location", label: "Location" },
+  { field: "source", label: "Source" },
+  { field: "url", label: "Posting URL" },
 ];
 
 /**
@@ -39,22 +40,45 @@ export function AddApplicationDialog({
   onInvalid: (message: string) => void;
 }) {
   const [fields, setFields] = useState(BLANK);
+  const firstField = useRef<HTMLInputElement>(null);
+  const open = state.kind !== "closed";
+
+  /**
+   * Clears the form whenever the dialog closes.
+   *
+   * The component is never unmounted — it returns null while closed — so its state survives.
+   * Resetting only in the Cancel handler left a successful save's values in place, and a second
+   * Save would post the same record again.
+   */
+  useEffect(() => {
+    if (!open) setFields(BLANK);
+  }, [open]);
+
+  /** Moves focus into the dialog on open, and closes it on Escape. */
+  useEffect(() => {
+    if (!open) return;
+
+    firstField.current?.focus();
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open, onClose]);
 
   if (state.kind === "closed") return null;
 
   const busy = state.kind === "submitting";
 
-  function close() {
-    setFields(BLANK);
-    onClose();
-  }
-
   function submit(event: React.FormEvent) {
     event.preventDefault();
 
-    const missing = REQUIRED.filter((name) => !fields[name].trim());
+    const missing = REQUIRED.filter(({ field }) => !fields[field].trim());
     if (missing.length > 0) {
-      onInvalid(`${missing.join(", ")} ${missing.length > 1 ? "are" : "is"} required`);
+      const names = missing.map(({ label }) => label).join(", ");
+      onInvalid(`${names} ${missing.length > 1 ? "are" : "is"} required`);
       return;
     }
 
@@ -75,17 +99,26 @@ export function AddApplicationDialog({
       className="fixed inset-0 z-50 flex items-center justify-center p-6"
       style={{ background: "oklch(10% 0.01 250 / 65%)" }}
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !busy) close();
+        if (event.target === event.currentTarget && !busy) onClose();
       }}
     >
       <form
         onSubmit={submit}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-application-heading"
         className="max-h-full w-[440px] overflow-auto rounded-[10px] border border-line bg-panel p-5"
       >
-        <h2 className="font-display text-base font-bold">Add application</h2>
+        <h2
+          id="add-application-heading"
+          className="font-display text-base font-bold"
+        >
+          Add application
+        </h2>
 
         <div className="mt-4 grid gap-3">
           <Field
+            ref={firstField}
             label="Company"
             required
             value={fields.company}
@@ -168,7 +201,7 @@ export function AddApplicationDialog({
         <div className="mt-5 flex justify-end gap-2">
           <button
             type="button"
-            onClick={close}
+            onClick={onClose}
             disabled={busy}
             className="rounded-[7px] border border-line px-3.5 py-2 text-[13px] font-semibold text-ink-dim hover:border-line-strong hover:text-ink disabled:opacity-50"
           >
@@ -188,6 +221,7 @@ export function AddApplicationDialog({
 }
 
 function Field({
+  ref,
   label,
   value,
   onChange,
@@ -195,6 +229,7 @@ function Field({
   placeholder,
   type = "text",
 }: {
+  ref?: React.Ref<HTMLInputElement>;
   label: string;
   value: string;
   onChange: (value: string) => void;
@@ -209,6 +244,7 @@ function Field({
         {required && <span className="ml-0.5 text-accent">*</span>}
       </span>
       <input
+        ref={ref}
         type={type}
         value={value}
         placeholder={placeholder}

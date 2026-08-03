@@ -5,7 +5,11 @@
  * The exact timestamp stays available as a tooltip.
  */
 export function relativeTime(iso: string): string {
-  const seconds = (Date.now() - new Date(iso).getTime()) / 1000;
+  const time = new Date(iso).getTime();
+  if (Number.isNaN(time)) return "unknown";
+
+  const seconds = (Date.now() - time) / 1000;
+  if (seconds < 0) return "in the future";
 
   if (seconds < 60) return "just now";
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
@@ -17,13 +21,24 @@ export function relativeTime(iso: string): string {
 
 /** Renders an ISO timestamp in full, for the tooltip behind the relative time. */
 export function exactTime(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "Unrecognised timestamp";
+
+  return date.toLocaleString(undefined, {
     dateStyle: "medium",
     timeStyle: "short",
   });
 }
 
-/** Today as `YYYY-MM-DD`, for stamping an applied date locally. */
+/**
+ * Today as `YYYY-MM-DD` in the viewer's own timezone.
+ *
+ * Built from the local date parts rather than `toISOString`, which converts to UTC first: at
+ * 01:30 in UTC+3 that would stamp yesterday's date.
+ */
 export function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
 }

@@ -74,6 +74,7 @@ export function ApplicationsTable({
   onSortChange,
   rowStates,
   onStatusChange,
+  onDismissError,
   emptyMessage,
   onAdd,
 }: {
@@ -82,6 +83,7 @@ export function ApplicationsTable({
   onSortChange: (sort: Sort) => void;
   rowStates: Record<string, RowState>;
   onStatusChange: (application: Application, next: Status) => void;
+  onDismissError: (id: string) => void;
   emptyMessage: string;
   onAdd: () => void;
 }) {
@@ -101,16 +103,31 @@ export function ApplicationsTable({
             {COLUMNS.map(({ key, label }) => (
               <th
                 key={label}
-                onClick={key ? () => toggle(key) : undefined}
-                className={`border-b border-line px-3.5 py-2.5 text-[11px] font-semibold tracking-[0.04em] text-ink-dim uppercase ${
-                  key ? "cursor-pointer select-none hover:text-ink" : ""
-                }`}
+                scope="col"
+                aria-sort={
+                  key === sort.key
+                    ? sort.ascending
+                      ? "ascending"
+                      : "descending"
+                    : undefined
+                }
+                className="border-b border-line px-3.5 py-2.5 text-[11px] font-semibold tracking-[0.04em] text-ink-dim uppercase"
               >
-                {label}
-                {key === sort.key && (
-                  <span className="ml-1 text-accent">
-                    {sort.ascending ? "▲" : "▼"}
-                  </span>
+                {key ? (
+                  <button
+                    type="button"
+                    onClick={() => toggle(key)}
+                    className="cursor-pointer tracking-[0.04em] uppercase hover:text-ink focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+                  >
+                    {label}
+                    {key === sort.key && (
+                      <span className="ml-1 text-accent">
+                        {sort.ascending ? "▲" : "▼"}
+                      </span>
+                    )}
+                  </button>
+                ) : (
+                  label
                 )}
               </th>
             ))}
@@ -137,6 +154,7 @@ export function ApplicationsTable({
                 application={application}
                 state={rowStates[application.id] ?? { kind: "idle" }}
                 onStatusChange={onStatusChange}
+                onDismissError={() => onDismissError(application.id)}
               />
             ))
           )}
@@ -150,26 +168,39 @@ function Row({
   application,
   state,
   onStatusChange,
+  onDismissError,
 }: {
   application: Application;
   state: RowState;
   onStatusChange: (application: Application, next: Status) => void;
+  onDismissError: () => void;
 }) {
   return (
     <tr className="border-t border-line hover:bg-raised">
       <td className="px-3.5 py-2.5">
-        <a
-          href={application.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-semibold text-ink hover:text-accent"
-        >
-          {application.company}
-        </a>
-        {state.kind === "failed" && (
-          <span className="ml-2 text-xs text-danger" role="alert">
-            {state.message}
+        {application.url ? (
+          <a
+            href={application.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-ink hover:text-accent"
+          >
+            {application.company}
+          </a>
+        ) : (
+          <span className="font-semibold text-ink" title="No posting link recorded">
+            {application.company}
           </span>
+        )}
+        {state.kind === "failed" && (
+          <button
+            type="button"
+            onClick={onDismissError}
+            title="Dismiss"
+            className="ml-2 text-xs text-danger hover:underline"
+          >
+            {state.message} ✕
+          </button>
         )}
       </td>
       <td className="px-3.5 py-2.5">{application.role}</td>
