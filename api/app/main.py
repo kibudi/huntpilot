@@ -74,6 +74,30 @@ async def create_application(payload: ApplicationCreate) -> ApplicationRead:
     return ApplicationRead.model_validate(stored)
 
 
+@app.delete("/api/applications/{application_id}", status_code=HTTPStatus.NO_CONTENT)
+async def delete_application(application_id: PydanticObjectId) -> None:
+    """Removes one application permanently.
+
+    The deletion is issued as a single conditional operation rather than a read followed by a
+    delete, and ``deleted_count`` is what distinguishes a hit from a miss. The read-then-delete
+    form has a window in which a concurrent request removes the document in between, which would
+    report success for a delete that did nothing.
+
+    A repeat call is a 404 rather than another 204. The alternative — treating every delete as
+    successful — would hide a wrong identifier, and this is the one endpoint whose mistakes cannot
+    be undone.
+
+    Nothing is returned: 204 forbids a body, and echoing a document the server has just destroyed
+    would invite a client to keep using it.
+
+    Raises:
+        HTTPException: 404 if no application has this identifier.
+    """
+    result = await Application.find_one(Application.id == application_id).delete()
+    if result is None or result.deleted_count == 0:
+        raise HTTPException(HTTPStatus.NOT_FOUND, "Application not found")
+
+
 @app.patch("/api/applications/{application_id}")
 async def update_application(
     application_id: PydanticObjectId, payload: ApplicationUpdate

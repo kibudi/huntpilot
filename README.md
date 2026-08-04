@@ -14,7 +14,7 @@ through the pipeline, search, filter and sort.
 
 | | |
 |---|---|
-| API | FastAPI + Beanie ODM on MongoDB Atlas, 4 endpoints, 37 tests |
+| API | FastAPI + Beanie ODM on MongoDB Atlas, 5 endpoints, 43 tests |
 | Dashboard | React 19 + TypeScript + Tailwind v4, one screen, inline status editing |
 | Containers | `docker compose up` runs both |
 
@@ -55,7 +55,7 @@ Vite proxies `/api` to port 8000, so the browser sees one origin either way.
 
 ```sh
 cd api
-uv run pytest                 # 37 tests; needs a live MongoDB
+uv run pytest                 # 43 tests; needs a live MongoDB
 uv run mypy app tests         # strict
 uv run ruff check app tests
 
@@ -101,6 +101,7 @@ docs/        plan.html — reveal.js deck of the original plan
 | `GET` | `/api/applications` | all applications, most recently updated first |
 | `POST` | `/api/applications` | create one |
 | `PATCH` | `/api/applications/{id}` | change one; only fields sent are written |
+| `DELETE` | `/api/applications/{id}` | remove one permanently; `204`, or `404` if already gone |
 
 ## Design notes
 
@@ -121,7 +122,7 @@ them as local time.
 
 ## Known limitations
 
-- No `DELETE` endpoint, so the dashboard has no delete control
+- The dashboard has no delete control; `DELETE` exists on the API but nothing calls it yet
 - No pagination; the list endpoint returns everything
 - Nothing prevents two applications sharing a `url`
 - Required strings accept `""`, and free text has no maximum length, so a payload over BSON's
