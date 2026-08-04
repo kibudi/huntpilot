@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { createApplication, listApplications, updateApplication } from "./api";
+import {
+  createApplication,
+  deleteApplication,
+  listApplications,
+  updateApplication,
+} from "./api";
 import { AddApplicationDialog } from "./components/AddApplicationDialog";
+import { ConfirmDeleteDialog } from "./components/ConfirmDeleteDialog";
 import {
   ApplicationsTable,
   sortApplications,
@@ -8,7 +14,12 @@ import {
 } from "./components/ApplicationsTable";
 import { Toolbar, type StatusFilter } from "./components/Toolbar";
 import { today } from "./format";
-import type { DialogState, LoadState, RowState } from "./state";
+import type {
+  DeleteState,
+  DialogState,
+  LoadState,
+  RowState,
+} from "./state";
 import {
   STATUSES,
   type Application,
@@ -20,6 +31,9 @@ import {
 export default function App() {
   const [load, setLoad] = useState<LoadState>({ kind: "loading" });
   const [dialog, setDialog] = useState<DialogState>({ kind: "closed" });
+  const [pendingDelete, setPendingDelete] = useState<DeleteState>({
+    kind: "closed",
+  });
   const [rowStates, setRowStates] = useState<Record<string, RowState>>({});
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<StatusFilter>(null);
@@ -130,6 +144,47 @@ export default function App() {
     setRowStates((current) => ({ ...current, [id]: { kind: "idle" } }));
   }
 
+  /**
+   * Destroys the application awaiting confirmation and drops it from the list.
+   *
+   * The row is removed only after the API confirms, unlike the optimistic status change. A status
+   * that fails can be rolled back to its previous value; a row removed optimistically has nowhere
+   * to roll back to except a refetch, and showing it briefly vanish and return reads as a bug.
+   *
+   * The removal is applied whatever the load state, so a delete that lands while the list is
+   * reloading is not silently discarded.
+   */
+  async function confirmDelete() {
+    if (pendingDelete.kind === "closed") return;
+    const { application } = pendingDelete;
+    setPendingDelete({ kind: "deleting", application });
+
+    try {
+      await deleteApplication(application.id);
+      setLoad((current) =>
+        current.kind === "ready"
+          ? {
+              ...current,
+              applications: current.applications.filter(
+                (candidate) => candidate.id !== application.id,
+              ),
+            }
+          : current,
+      );
+      setRowStates((current) => {
+        const { [application.id]: _removed, ...rest } = current;
+        return rest;
+      });
+      setPendingDelete({ kind: "closed" });
+    } catch (error) {
+      setPendingDelete({
+        kind: "failed",
+        application,
+        message: (error as Error).message,
+      });
+    }
+  }
+
   /** Creates an application and puts it at the top, where the newest-updated sort would place it. */
   async function add(payload: ApplicationCreate) {
     setDialog({ kind: "submitting" });
@@ -196,6 +251,9 @@ export default function App() {
           rowStates={rowStates}
           onStatusChange={changeStatus}
           onDismissError={dismissError}
+          onDelete={(application) =>
+            setPendingDelete({ kind: "confirming", application })
+          }
           onAdd={() => setDialog({ kind: "open" })}
           emptyMessage={
             applications.length === 0
@@ -210,6 +268,12 @@ export default function App() {
         onClose={() => setDialog({ kind: "closed" })}
         onSubmit={add}
         onInvalid={(message) => setDialog({ kind: "invalid", message })}
+      />
+
+      <ConfirmDeleteDialog
+        state={pendingDelete}
+        onCancel={() => setPendingDelete({ kind: "closed" })}
+        onConfirm={confirmDelete}
       />
     </div>
   );

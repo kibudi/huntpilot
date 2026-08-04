@@ -26,6 +26,7 @@ const COLUMNS: { key: SortKey | null; label: string }[] = [
   { key: "applied_date", label: "Applied" },
   { key: "updated_at", label: "Updated" },
   { key: null, label: "Notes" },
+  { key: null, label: "" },
 ];
 
 /** Columns that read most usefully newest-first when first selected. */
@@ -75,6 +76,7 @@ export function ApplicationsTable({
   rowStates,
   onStatusChange,
   onDismissError,
+  onDelete,
   emptyMessage,
   onAdd,
 }: {
@@ -84,6 +86,7 @@ export function ApplicationsTable({
   rowStates: Record<string, RowState>;
   onStatusChange: (application: Application, next: Status) => void;
   onDismissError: (id: string) => void;
+  onDelete: (application: Application) => void;
   emptyMessage: string;
   onAdd: () => void;
 }) {
@@ -155,6 +158,7 @@ export function ApplicationsTable({
                 state={rowStates[application.id] ?? { kind: "idle" }}
                 onStatusChange={onStatusChange}
                 onDismissError={() => onDismissError(application.id)}
+                onDelete={() => onDelete(application)}
               />
             ))
           )}
@@ -169,14 +173,16 @@ function Row({
   state,
   onStatusChange,
   onDismissError,
+  onDelete,
 }: {
   application: Application;
   state: RowState;
   onStatusChange: (application: Application, next: Status) => void;
   onDismissError: () => void;
+  onDelete: () => void;
 }) {
   return (
-    <tr className="border-t border-line hover:bg-raised">
+    <tr className="group border-t border-line hover:bg-raised">
       <td className="px-3.5 py-2.5">
         {application.url ? (
           <a
@@ -229,6 +235,18 @@ function Row({
         >
           {application.notes || "—"}
         </div>
+      </td>
+      <td className="px-3.5 py-2.5 text-right">
+        <button
+          type="button"
+          onClick={onDelete}
+          disabled={state.kind === "saving"}
+          title={`Delete ${application.company} — ${application.role}`}
+          aria-label={`Delete ${application.company} — ${application.role}`}
+          className="cursor-pointer rounded px-1.5 text-ink-dim opacity-0 group-hover:opacity-100 hover:text-danger focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:opacity-0"
+        >
+          ✕
+        </button>
       </td>
     </tr>
   );
