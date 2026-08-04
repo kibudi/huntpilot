@@ -23,6 +23,19 @@ export type RowState =
   | { kind: "saving" }
   | { kind: "failed"; message: string };
 
+/**
+ * The delete-confirmation dialog.
+ *
+ * Every case except `closed` carries the application itself rather than its id, so the dialog can
+ * name what is about to be destroyed without looking it up in a list that the delete is in the
+ * middle of changing.
+ */
+export type DeleteState =
+  | { kind: "closed" }
+  | { kind: "confirming"; application: Application }
+  | { kind: "deleting"; application: Application }
+  | { kind: "failed"; application: Application; message: string };
+
 /** The add-application dialog. */
 export type DialogState =
   | { kind: "closed" }
