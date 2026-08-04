@@ -1,0 +1,35 @@
+# Starts the whole app with `docker compose up`.
+#
+# MONGODB_URI and MONGODB_DB come from the repo-root .env, which is gitignored. Values are passed
+# as environment variables rather than the file being copied into the image, so a built image
+# carries no credentials.
+services:
+  api:
+    build: ./api
+    environment:
+      MONGODB_URI: ${MONGODB_URI:?set MONGODB_URI in .env}
+      MONGODB_DB: ${MONGODB_DB:-huntpilot}
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  web:
+    build: ./web
+    ports:
+      - "5173:80"
+    # nginx proxies /api to the api service, so it must be answering before the browser can load
+    # anything useful.
+    depends_on:
+      api:
+        condition: service_healthy
