@@ -7,6 +7,7 @@ from http import HTTPStatus
 
 from beanie import PydanticObjectId
 from fastapi import FastAPI, HTTPException
+from pymongo.errors import DuplicateKeyError
 
 from app.db import init_db
 from app.models import Application
@@ -63,11 +64,24 @@ async def create_application(payload: ApplicationCreate) -> ApplicationRead:
     never-modified document satisfies ``created_at == updated_at``. Two independent calls can fall
     either side of a millisecond boundary and break that.
 
+    A posting link already tracked is a 409. The check is left to the unique index rather than a
+    lookup before the insert: a lookup and an insert are two operations, and two requests arriving
+    together both pass the lookup before either writes. Blank links are exempt, since a job from
+    an agency or an undisclosed employer has none.
+
     Raises:
+        HTTPException: 409 if another application already has this url.
         HTTPException: 404 if the document cannot be read back, which should not occur.
     """
     now = datetime.now(UTC)
-    document = await Application(**payload.model_dump(), created_at=now, updated_at=now).insert()
+    try:
+        document = await Application(
+            **payload.model_dump(), created_at=now, updated_at=now
+        ).insert()
+    except DuplicateKeyError as error:
+        raise HTTPException(
+            HTTPStatus.CONFLICT, "An application with this url is already tracked"
+        ) from error
     stored = await Application.get(document.id)
     if stored is None:
         raise HTTPException(HTTPStatus.NOT_FOUND, "Application disappeared after creation")
@@ -112,8 +126,12 @@ async def update_application(
     An empty body is accepted and changes nothing, including ``updated_at`` — nothing was
     modified, so claiming otherwise would be a lie the dashboard sorts on.
 
+    Moving ``url`` onto a link another application already holds is a 409, for the same reason the
+    create endpoint refuses one: it would turn two records into duplicates through the back door.
+
     Raises:
         HTTPException: 404 if no application has this identifier.
+        HTTPException: 409 if the new url is already tracked by another application.
     """
     changes = payload.model_dump(exclude_unset=True)
     document = await Application.get(application_id)
@@ -121,7 +139,12 @@ async def update_application(
         raise HTTPException(HTTPStatus.NOT_FOUND, "Application not found")
 
     if changes:
-        await document.set({**changes, "updated_at": datetime.now(UTC)})
+        try:
+            await document.set({**changes, "updated_at": datetime.now(UTC)})
+        except DuplicateKeyError as error:
+            raise HTTPException(
+                HTTPStatus.CONFLICT, "An application with this url is already tracked"
+            ) from error
         refreshed = await Application.get(application_id)
         if refreshed is None:
             raise HTTPException(HTTPStatus.NOT_FOUND, "Application disappeared during update")

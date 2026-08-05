@@ -51,11 +51,28 @@ class Application(Document):
     updated_at: datetime = Field(default_factory=_now)
 
     class Settings:
-        """Collection name and the indexes backing the sort keys."""
+        """Collection name, the indexes backing the sort keys, and the uniqueness rule on ``url``.
+
+        The uniqueness index is partial rather than plain. A posting link identifies a job, so two
+        documents sharing one are the same application recorded twice — but a job found through an
+        agency or an undisclosed employer genuinely has no link, and those are stored as ``""``.
+        A plain unique index would read every one of those blanks as a duplicate of the others and
+        refuse to build, taking the application down with it, so uniqueness is enforced only where
+        a link is actually present.
+
+        Sparse would not do instead: it skips documents where the field is missing, and ``url`` is
+        always present, merely empty.
+        """
 
         name = "applications"
         indexes = [
             [("created_at", pymongo.DESCENDING)],
             [("updated_at", pymongo.DESCENDING)],
             [("applied_date", pymongo.DESCENDING)],
+            pymongo.IndexModel(
+                [("url", pymongo.ASCENDING)],
+                name="url_unique_when_present",
+                unique=True,
+                partialFilterExpression={"url": {"$gt": ""}},
+            ),
         ]

@@ -14,7 +14,7 @@ through the pipeline, search, filter and sort.
 
 | | |
 |---|---|
-| API | FastAPI + Beanie ODM on MongoDB Atlas, 5 endpoints, 43 tests |
+| API | FastAPI + Beanie ODM on MongoDB Atlas, 5 endpoints, 50 tests |
 | Dashboard | React 19 + TypeScript + Tailwind v4, one screen, inline status editing |
 | Containers | `docker compose up` runs both |
 
@@ -55,7 +55,7 @@ Vite proxies `/api` to port 8000, so the browser sees one origin either way.
 
 ```sh
 cd api
-uv run pytest                 # 43 tests; needs a live MongoDB
+uv run pytest                 # 50 tests; needs a live MongoDB
 uv run mypy app tests         # strict
 uv run ruff check app tests
 
@@ -99,7 +99,7 @@ docs/        plan.html — reveal.js deck of the original plan
 |---|---|---|
 | `GET` | `/health` | process is up; does not check the database |
 | `GET` | `/api/applications` | all applications, most recently updated first |
-| `POST` | `/api/applications` | create one |
+| `POST` | `/api/applications` | create one; `409` if that `url` is already tracked |
 | `PATCH` | `/api/applications/{id}` | change one; only fields sent are written |
 | `DELETE` | `/api/applications/{id}` | remove one permanently; `204`, or `404` if already gone |
 
@@ -116,15 +116,20 @@ on the way out, which one class cannot express.
 **MongoDB has no server-side defaults or on-update.** `updated_at` is set by the API on every
 write. A write that bypasses the API leaves it stale.
 
+**A posting link is unique, but only when there is one.** Two applications sharing a `url` are the
+same job recorded twice, so the database rejects the second. The index is *partial* rather than
+plain, because agency roles and undisclosed employers genuinely have no link and are stored as
+`""` — a plain unique index would read every blank as a duplicate of the others and refuse to
+build at all. Uniqueness is enforced by the index rather than a lookup before the insert, so two
+requests arriving together cannot both pass a check and then both write.
+
 **Timestamps are timezone-aware.** BSON stores no offset, so the client is created with
 `tz_aware=True`. Without it, timestamps serialise with no `Z` and a client in another zone reads
 them as local time.
 
 ## Known limitations
 
-- The dashboard has no delete control; `DELETE` exists on the API but nothing calls it yet
 - No pagination; the list endpoint returns everything
-- Nothing prevents two applications sharing a `url`
 - Required strings accept `""`, and free text has no maximum length, so a payload over BSON's
   16 MB limit fails as a 500 rather than a 422
 - No frontend tests
