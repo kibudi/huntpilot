@@ -100,7 +100,7 @@ docs/        plan.html — reveal.js deck of the original plan
 | `GET` | `/health` | process is up; does not check the database |
 | `GET` | `/api/applications` | all applications, most recently updated first |
 | `POST` | `/api/applications` | create one; `409` if that `url` is already tracked |
-| `PATCH` | `/api/applications/{id}` | change one; only fields sent are written |
+| `PATCH` | `/api/applications/{id}` | change one; only fields sent are written; `409` if that `url` is already tracked |
 | `DELETE` | `/api/applications/{id}` | remove one permanently; `204`, or `404` if already gone |
 
 ## Design notes
