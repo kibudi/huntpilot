@@ -33,3 +33,42 @@ services:
     depends_on:
       api:
         condition: service_healthy
+
+  # Celery's broker. No port is published: only the worker and beat talk to it, and exposing it
+  # would put an unauthenticated Redis on the host.
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # The worker and beat run the ./api image with a different command rather than an image of their
+  # own. There is one task and it lives in the api package, so a second tree would duplicate that
+  # package and its dependencies to add nothing.
+  worker:
+    build: ./api
+    command: ["celery", "-A", "app.worker.celery_app", "worker", "--loglevel=info"]
+    environment:
+      MONGODB_URI: ${MONGODB_URI:?set MONGODB_URI in .env}
+      MONGODB_DB: ${MONGODB_DB:-huntpilot}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # Beat only enqueues; the worker does the sweeping. It is a separate service because an embedded
+  # scheduler fires once per worker, so scheduling would double the moment a second worker starts.
+  beat:
+    build: ./api
+    command: ["celery", "-A", "app.worker.celery_app", "beat", "--loglevel=info"]
+    # Beat never opens the database — it only enqueues — but it imports the same settings object,
+    # which has no default for MONGODB_URI and so refuses to load without it.
+    environment:
+      MONGODB_URI: ${MONGODB_URI:?set MONGODB_URI in .env}
+      MONGODB_DB: ${MONGODB_DB:-huntpilot}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
