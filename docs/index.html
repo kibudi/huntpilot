@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>huntpilot — a job tracker that watches the boards back</title>
+<meta name="description" content="Sweeps company job boards on a schedule and reports what changed: roles that closed, roles still open weeks after you applied, and the handful actually worth reading.">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --page: #fffbf6;
+    --panel: #ffffff;
+    --raised: #fff4e3;
+    --line: #ffe5cc;
+    --line-strong: #ffca99;
+    --ink: #001524;
+    --ink-dim: #15616d;
+    --ink-faint: #7e9ea4;
+    --accent: #ff7d00;
+    --accent-ink: #b93f17;
+    --good: #15616d;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--ink);
+    font: 16px/1.65 ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 0 24px; }
+  code, .mono { font-family: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, monospace; }
+  .display { font-family: Fraunces, Georgia, "Times New Roman", serif; font-weight: 600; }
+
+  header.hero { padding: 76px 0 60px; }
+  .mark { display: flex; align-items: center; gap: 10px; margin-bottom: 30px; }
+  .mark .logo { color: var(--ink); flex: none; }
+  .mark b { font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 20px; letter-spacing: -0.02em; }
+  h1 {
+    font-family: Fraunces, Georgia, serif;
+    font-weight: 600;
+    font-size: clamp(36px, 5.6vw, 58px);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin: 0 0 22px;
+    max-width: 17ch;
+  }
+  h1 em { font-style: italic; color: var(--accent-ink); }
+  .lead { font-size: 19px; color: var(--ink-dim); max-width: 62ch; margin: 0 0 32px; }
+  .cta { display: flex; gap: 12px; flex-wrap: wrap; }
+  .btn {
+    display: inline-block; padding: 11px 18px; border-radius: 8px; text-decoration: none;
+    font-size: 14px; font-weight: 600; border: 1px solid var(--line-strong); color: var(--ink);
+    background: var(--panel);
+  }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  section { padding: 60px 0; border-top: 1px solid var(--line); }
+  h2 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--accent-ink); margin: 0 0 26px; font-weight: 700;
+  }
+  h3 { font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 19px; margin: 0 0 8px; }
+  p { margin: 0 0 16px; color: var(--ink-dim); }
+  p strong, li strong { color: var(--ink); font-weight: 600; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 22px;
+    box-shadow: 0 1px 2px rgba(0, 21, 36, 0.05);
+  }
+  .card p { margin: 0; font-size: 15px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  th, td { text-align: left; padding: 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--ink-faint); font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700; }
+  td.n { font-family: ui-monospace, monospace; color: var(--accent-ink); white-space: nowrap; font-size: 13px; }
+  .free { color: var(--good); font-size: 13px; white-space: nowrap; }
+
+  .figure { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 10px; box-shadow: 0 2px 10px rgba(0, 21, 36, 0.06); }
+  .figure img { display: block; width: 100%; height: auto; border-radius: 8px; }
+  .caption { font-size: 13.5px; color: var(--ink-faint); margin-top: 14px; }
+
+  .funnel { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin: 0 0 22px; }
+  .funnel b { font-family: Fraunces, Georgia, serif; font-size: 40px; letter-spacing: -0.02em; color: var(--ink); }
+  .funnel b.hit { color: var(--accent); }
+  .funnel span { color: var(--ink-faint); }
+
+  ul { margin: 0 0 16px; padding-left: 20px; color: var(--ink-dim); }
+  li { margin-bottom: 10px; }
+
+  .stack { display: grid; grid-template-columns: 128px 1fr; gap: 10px 18px; font-size: 15px; }
+  .stack dt { color: var(--ink-faint); }
+  .stack dd { margin: 0; color: var(--ink-dim); }
+
+  pre {
+    background: var(--raised); border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px; overflow-x: auto; font-size: 14px; color: var(--ink);
+  }
+  footer { padding: 44px 0 72px; color: var(--ink-faint); font-size: 14px; border-top: 1px solid var(--line); }
+  footer a { color: var(--ink-dim); }
+  a { color: var(--accent-ink); }
+  @media (max-width: 620px) { .stack { grid-template-columns: 1fr; gap: 2px 0; } }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="mark">
+      <svg class="logo" viewBox="0 0 64 64" width="34" height="34" aria-hidden="true">
+        <defs>
+          <linearGradient id="sweep" x1="32" y1="32" x2="60" y2="12" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#ff7d00" stop-opacity="0.85"/>
+            <stop offset="1" stop-color="#ff7d00" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <circle cx="32" cy="32" r="27" fill="none" stroke="currentColor" stroke-opacity="0.28" stroke-width="3"/>
+        <circle cx="32" cy="32" r="15.5" fill="none" stroke="currentColor" stroke-opacity="0.18" stroke-width="3"/>
+        <path d="M32 32 L32 5 A27 27 0 0 1 55.4 18.5 Z" fill="url(#sweep)"/>
+        <path d="M32 32 L55.4 18.5" stroke="#ff7d00" stroke-width="3.5" stroke-linecap="round"/>
+        <circle cx="44" cy="24" r="4.5" fill="#ff7d00"/>
+        <circle cx="20" cy="42" r="2.6" fill="currentColor" fill-opacity="0.35"/>
+        <circle cx="41" cy="45" r="2.6" fill="currentColor" fill-opacity="0.35"/>
+      </svg>
+      <b>huntpilot</b>
+    </div>
+    <h1>A job tracker that watches the boards <em>back</em>.</h1>
+    <p class="lead">
+      Job boards tell you what is open right now. They never tell you what <strong>changed</strong> —
+      and the changes are what matter when you are the one applying. huntpilot sweeps company job
+      boards on a schedule and reports the difference.
+    </p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/kibudi/huntpilot">View on GitHub</a>
+      <a class="btn" href="plan.html">The plan deck</a>
+      <a class="btn" href="board-tracker.md">Design note</a>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <h2>The questions no board answers</h2>
+    <div class="cards">
+      <div class="card">
+        <h3>It closed on you</h3>
+        <p>The role you applied to has disappeared from the board. It is filled. Stop waiting.</p>
+      </div>
+      <div class="card">
+        <h3>Still open, still silent</h3>
+        <p>You applied 30 days ago and the posting is still live. Silence is not rejection.</p>
+      </div>
+      <div class="card">
+        <h3>Reposted again</h3>
+        <p>The same job, listed every six weeks. Churn, or a spec nobody can meet.</p>
+      </div>
+    </div>
+    <p style="margin-top:24px">
+      None of that is answerable from a single snapshot. It needs board state stored over time and
+      joined against your own application log — which is the other half of this app.
+    </p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>One sweep, 28 boards</h2>
+    <div class="funnel">
+      <b>1,026</b><span>postings fetched</span>
+      <b class="hit">7</b><span>worth reading</span>
+    </div>
+    <table>
+      <tr><th>gate</th><th>what it does</th><th></th></tr>
+      <tr><td class="n">fetch</td><td>Greenhouse, Lever and Ashby, public JSON, no key and no scraping. A failing board is skipped, never fatal.</td><td class="free">free</td></tr>
+      <tr><td class="n">location</td><td>Israeli city spellings or advertised remote. Country names alone miss half of them — one sweep held 243 distinct location strings.</td><td class="free">free</td></tr>
+      <tr><td class="n">title</td><td>A whitelist of five role families, and a drop for titles that state seniority.</td><td class="free">free</td></tr>
+      <tr><td class="n">stack</td><td>Reads the description: the share of named technologies already known, and the lowest experience figure asked for.</td><td class="free">free</td></tr>
+      <tr><td class="n">reconcile</td><td><strong>The product.</strong> Still listed, newly appeared, or absent — compared against the last sweep.</td><td class="free">free</td></tr>
+    </table>
+    <p class="caption">
+      Every gate is free and local. No model call, no paid API, no scraping — the boards publish
+      this themselves.
+    </p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>The dashboard</h2>
+    <div class="figure">
+      <img src="assets/board.jpg" alt="The Board tab: seven swept postings with company, title, location, days listed and first seen, filtered by region and status.">
+    </div>
+    <p class="caption">
+      Every role the sweep kept, how long it has been listed, and whether it is already in the
+      pipeline. Chips narrow by region and by open or closed; <em>Track</em> copies a posting into
+      the applications list.
+    </p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>How it fits together</h2>
+    <svg viewBox="0 0 900 300" width="100%" role="img" aria-label="Architecture: React dashboard and Discord bot call the FastAPI API, which owns MongoDB. A Celery worker driven by Beat and Redis sweeps three job board APIs and writes to the same database." style="max-width:100%">
+      <defs>
+        <style>
+          .box { fill: #ffffff; stroke: #ffca99; stroke-width: 1.5; rx: 10; }
+          .lbl { fill: #001524; font: 600 14px ui-sans-serif, system-ui, sans-serif; }
+          .sub { fill: #7e9ea4; font: 12px ui-monospace, monospace; }
+          .flow { stroke: #ffca99; stroke-width: 1.5; fill: none; marker-end: url(#a); }
+          .accent { stroke: #ff7d00; }
+        </style>
+        <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M0 0 L10 5 L0 10 z" fill="#ffca99"/>
+        </marker>
+      </defs>
+
+      <rect class="box" x="40" y="20" width="170" height="56" rx="10"/>
+      <text class="lbl" x="60" y="45">web</text><text class="sub" x="60" y="63">React · TypeScript</text>
+
+      <rect class="box" x="240" y="20" width="170" height="56" rx="10"/>
+      <text class="lbl" x="260" y="45">bot</text><text class="sub" x="260" y="63">not built</text>
+
+      <rect class="box" x="140" y="122" width="170" height="56" rx="10"/>
+      <text class="lbl" x="160" y="147">api</text><text class="sub" x="160" y="165">FastAPI</text>
+
+      <rect class="box" x="140" y="224" width="170" height="56" rx="10"/>
+      <text class="lbl" x="160" y="249">MongoDB</text><text class="sub" x="160" y="267">Beanie ODM</text>
+
+      <rect class="box" x="480" y="224" width="170" height="56" rx="10"/>
+      <text class="lbl" x="500" y="249">worker</text><text class="sub" x="500" y="267">Celery · every 6h</text>
+
+      <rect class="box" x="480" y="122" width="170" height="56" rx="10"/>
+      <text class="lbl" x="500" y="147">beat + redis</text><text class="sub" x="500" y="165">the schedule</text>
+
+      <rect class="box" x="700" y="224" width="170" height="56" rx="10"/>
+      <text class="lbl" x="720" y="243">job boards</text><text class="sub" x="720" y="264">Greenhouse · Lever</text>
+
+      <path class="flow" d="M125 78 L200 118"/>
+      <path class="flow" d="M325 78 L262 118"/>
+      <path class="flow" d="M225 180 L225 220"/>
+      <path class="flow" d="M565 180 L565 220"/>
+      <path class="flow accent" d="M478 252 L316 252"/>
+      <path class="flow" d="M698 252 L656 252"/>
+    </svg>
+    <p class="caption">
+      The worker reaches the database directly rather than through the API: it is the same codebase
+      run with a different command, and a round trip over HTTP would buy nothing.
+    </p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Decisions worth defending</h2>
+    <ul>
+      <li><strong>Closure is inferred from repeated absence, never from one.</strong> No board announces that a role was filled; the entry simply stops coming back. Boards also intermittently drop live entries, so a posting must be missing twice before it counts as closed — telling you a job is gone while it is still taking applications is the one failure this cannot afford.</li>
+      <li><strong>A board that fails to load is skipped, not treated as empty.</strong> Since absence is the signal, reconciling an empty list after a failed fetch would mark every one of that company's roles as heading for closed.</li>
+      <li><strong>One document per posting for its whole life</strong>, never one per sweep. The collection grows with the market rather than with elapsed time.</li>
+      <li><strong>The description is stored, not the score.</strong> Scores depend on a vocabulary that changes as it is corrected, so storing the text keeps every posting rescorable without fetching a board again.</li>
+      <li><strong>The dashboard never decides what counts as Israel.</strong> It used to keep its own copy of the location list; the two drifted, and postings in the missing cities were stored and then quietly left out of the count.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Built with</h2>
+    <dl class="stack">
+      <dt>API</dt><dd>FastAPI, Beanie ODM, MongoDB Atlas, <span class="mono">uv</span></dd>
+      <dt>Dashboard</dt><dd>React 19, TypeScript, Tailwind v4, Vite</dd>
+      <dt>Worker</dt><dd>Celery + Beat on Redis</dd>
+      <dt>Quality</dt><dd>pytest, mypy (strict), ruff, oxlint — 121 tests in CI</dd>
+      <dt>Runtime</dt><dd>Docker Compose, nginx, GitHub Actions</dd>
+    </dl>
+    <p style="margin-top:24px">Run the whole thing, or one sweep by hand:</p>
+    <pre>docker compose up
+
+cd api &amp;&amp; uv run python -m app.sweep</pre>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    Built by <a href="https://github.com/kibudi">Shahar Kibudi</a> ·
+    <a href="https://github.com/kibudi/huntpilot">source</a> ·
+    a portfolio project about job hunting, built while job hunting.
+  </div>
+</footer>
+
+</body>
+</html>
