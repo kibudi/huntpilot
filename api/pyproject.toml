@@ -5,8 +5,11 @@ description = "huntpilot API — owns the database"
 requires-python = ">=3.12"
 dependencies = [
     "beanie>=1.27",
+    "celery>=5.5.3",
     "fastapi>=0.141.1",
+    "httpx>=0.28.1",
     "pydantic-settings>=2.14.2",
+    "redis>=6.4.0",
     "uvicorn[standard]>=0.52.1",
 ]
 
@@ -16,7 +19,6 @@ dev = [
     "ruff>=0.8",
     "mypy>=1.13",
     "pytest-asyncio>=1.4.0",
-    "httpx>=0.28.1",
 ]
 
 [tool.uv]
@@ -25,6 +27,12 @@ package = false
 [tool.mypy]
 python_version = "3.12"
 strict = true
+
+# Celery ships no py.typed marker and there are no stubs for it, so strict mode would refuse the
+# import outright. Scoped to celery alone rather than relaxed globally.
+[[tool.mypy.overrides]]
+module = ["celery.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
