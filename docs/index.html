@@ -11,16 +11,16 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
 <style>
   :root {
-    --page: #fffbf6;
-    --panel: #ffffff;
-    --raised: #fff4e3;
-    --line: #ffe5cc;
-    --line-strong: #ffca99;
+    --page: #ffecd1;
+    --panel: #fff7ed;
+    --raised: #fff0da;
+    --line: #ffc574;
+    --line-strong: #ff9f17;
     --ink: #001524;
     --ink-dim: #15616d;
-    --ink-faint: #7e9ea4;
+    --ink-faint: #78290f;
     --accent: #ff7d00;
-    --accent-ink: #b93f17;
+    --accent-ink: #78290f;
     --good: #15616d;
   }
   * { box-sizing: border-box; }
@@ -206,51 +206,13 @@
 <section>
   <div class="wrap">
     <h2>How it fits together</h2>
-    <svg viewBox="0 0 900 300" width="100%" role="img" aria-label="Architecture: React dashboard and Discord bot call the FastAPI API, which owns MongoDB. A Celery worker driven by Beat and Redis sweeps three job board APIs and writes to the same database." style="max-width:100%">
-      <defs>
-        <style>
-          .box { fill: #ffffff; stroke: #ffca99; stroke-width: 1.5; rx: 10; }
-          .lbl { fill: #001524; font: 600 14px ui-sans-serif, system-ui, sans-serif; }
-          .sub { fill: #7e9ea4; font: 12px ui-monospace, monospace; }
-          .flow { stroke: #ffca99; stroke-width: 1.5; fill: none; marker-end: url(#a); }
-          .accent { stroke: #ff7d00; }
-        </style>
-        <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-          <path d="M0 0 L10 5 L0 10 z" fill="#ffca99"/>
-        </marker>
-      </defs>
-
-      <rect class="box" x="40" y="20" width="170" height="56" rx="10"/>
-      <text class="lbl" x="60" y="45">web</text><text class="sub" x="60" y="63">React · TypeScript</text>
-
-      <rect class="box" x="240" y="20" width="170" height="56" rx="10"/>
-      <text class="lbl" x="260" y="45">bot</text><text class="sub" x="260" y="63">not built</text>
-
-      <rect class="box" x="140" y="122" width="170" height="56" rx="10"/>
-      <text class="lbl" x="160" y="147">api</text><text class="sub" x="160" y="165">FastAPI</text>
-
-      <rect class="box" x="140" y="224" width="170" height="56" rx="10"/>
-      <text class="lbl" x="160" y="249">MongoDB</text><text class="sub" x="160" y="267">Beanie ODM</text>
-
-      <rect class="box" x="480" y="224" width="170" height="56" rx="10"/>
-      <text class="lbl" x="500" y="249">worker</text><text class="sub" x="500" y="267">Celery · every 6h</text>
-
-      <rect class="box" x="480" y="122" width="170" height="56" rx="10"/>
-      <text class="lbl" x="500" y="147">beat + redis</text><text class="sub" x="500" y="165">the schedule</text>
-
-      <rect class="box" x="700" y="224" width="170" height="56" rx="10"/>
-      <text class="lbl" x="720" y="243">job boards</text><text class="sub" x="720" y="264">Greenhouse · Lever</text>
-
-      <path class="flow" d="M125 78 L200 118"/>
-      <path class="flow" d="M325 78 L262 118"/>
-      <path class="flow" d="M225 180 L225 220"/>
-      <path class="flow" d="M565 180 L565 220"/>
-      <path class="flow accent" d="M478 252 L316 252"/>
-      <path class="flow" d="M698 252 L656 252"/>
-    </svg>
+    <div class="figure">
+      <img src="assets/architecture.svg" alt="The dashboard calls the FastAPI service, which owns MongoDB. Beat schedules a sweep through Redis, a Celery worker runs it against the Greenhouse, Lever and Ashby APIs, and writes to the same database.">
+    </div>
     <p class="caption">
       The worker reaches the database directly rather than through the API: it is the same codebase
-      run with a different command, and a round trip over HTTP would buy nothing.
+      run with a different command, so a round trip over HTTP would buy nothing. What it looks for
+      comes from a profile, not from the code.
     </p>
   </div>
 </section>

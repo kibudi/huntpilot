@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/kibudi/huntpilot/actions/workflows/ci.yml/badge.svg)](https://github.com/kibudi/huntpilot/actions/workflows/ci.yml)
 
-A job-application tracker, and a tracker for the job boards themselves. One backend, a web
-dashboard, a scheduled sweep, and — eventually — a Discord bot, so tracking an application takes a
-slash command rather than opening a spreadsheet you stop updating after two weeks.
+A job-application tracker, and a tracker for the job boards themselves: one backend, a web
+dashboard and a scheduled sweep, so a job hunt lives somewhere better than a spreadsheet you stop
+updating after two weeks.
 
 The part worth reading about is the board tracker: it watches company job boards over time and
 reports what **changed**, which is the one thing no job board will tell you.
@@ -26,7 +26,7 @@ containerisation.
 | CI | GitHub Actions: ruff, mypy and pytest against a MongoDB service, plus the frontend build |
 | Containers | `docker compose up` runs all of it |
 
-**Not built:** Discord bot, the digest, Kubernetes, Terraform.
+**Not built:** the digest, Kubernetes, Terraform.
 
 ## The board tracker
 
@@ -126,12 +126,11 @@ because Beanie cannot construct a `Document` before `init_beanie` has reached a 
 ## Architecture
 
 ```
-          ┌──────────────┐        ┌──────────────┐
-          │ web (React)  │        │ bot (Discord)│  not built
-          └──────┬───────┘        └──────┬───────┘
-                 │ HTTP                  │ HTTP
-                 └───────────┬───────────┘
-                             ▼
+                     ┌──────────────┐
+                     │ web (React)  │
+                     └──────┬───────┘
+                            │ HTTP
+                            ▼
                      ┌───────────────┐
                      │ api (FastAPI) │
                      └───────┬───────┘
@@ -151,7 +150,7 @@ because Beanie cannot construct a `Document` before `init_beanie` has reached a 
 
 The worker reaches MongoDB directly rather than through the API, because it is the same codebase
 run with a different command — the sweep imports `boards.py` and `relevance.py` and would gain
-nothing from a round trip through HTTP. The dashboard and the bot go through the API.
+nothing from a round trip through HTTP. The dashboard goes through the API.
 
 `api/` and the worker built from it are the only things that touch the database. In the container image, nginx serves the
 built dashboard and proxies `/api` to the API service, which is why the client can call bare

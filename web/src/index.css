@@ -22,18 +22,18 @@
  * rather than to whatever the body is using, if the font never arrives.
  */
 @theme {
-  --color-page: #fffbf6;
-  --color-panel: #ffffff;
-  --color-raised: #fff4e3;
-  --color-line: #ffe5cc;
-  --color-line-strong: #ffca99;
+  --color-page: #ffecd1;
+  --color-panel: #fff7ed;
+  --color-raised: #fff0da;
+  --color-line: #ffc574;
+  --color-line-strong: #ff9f17;
   --color-ink: #001524;
   --color-ink-dim: #15616d;
-  --color-ink-faint: #7e9ea4;
+  --color-ink-faint: #78290f;
   --color-accent: #ff7d00;
-  --color-accent-ink: #b93f17;
+  --color-accent-ink: #78290f;
   --color-accent-bright: #cc6300;
-  --color-danger: #b93f17;
+  --color-danger: #78290f;
 
   --font-display: Fraunces, Georgia, "Times New Roman", serif;
   --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
