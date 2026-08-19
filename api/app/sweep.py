@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from app.boards import fetch_board, reconcile
 from app.db import init_db
 from app.models import ATS, Company
+from app.profile import profile
 from app.relevance import relevant
 
 BOARD_TIMEOUT = httpx.Timeout(20.0)
@@ -68,6 +69,10 @@ async def sweep(client: httpx.AsyncClient) -> SweepSummary:
     the sweep and the ways a board can disappoint are not confined to one library.
     ``BaseException`` is deliberately not caught, so a cancelled sweep still stops.
 
+    The configured profile is read here, at the edge, and handed to ``relevant``. It is one of the
+    two places that touch the loaded default — every filter it drives takes the profile as an
+    argument — and reading it once per sweep means one pass judges every board by the same rules.
+
     Args:
         client: An HTTP client to read every board with, shared across the pass.
 
@@ -79,7 +84,7 @@ async def sweep(client: httpx.AsyncClient) -> SweepSummary:
     for company in await Company.find_all().to_list():
         try:
             postings = await fetch_board(company, client)
-            result = await reconcile(company, relevant(postings))
+            result = await reconcile(company, relevant(postings, profile))
         except Exception as error:
             summary.boards_failed += 1
             summary.failures.append(

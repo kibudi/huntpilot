@@ -11,6 +11,7 @@ from pymongo.errors import DuplicateKeyError
 
 from app.db import init_db
 from app.models import Application, Company, Posting, PostingStatus
+from app.profile import profile
 from app.relevance import region
 from app.schemas import ApplicationCreate, ApplicationRead, ApplicationUpdate, PostingRead
 
@@ -76,9 +77,9 @@ async def list_postings(status: PostingStatus | None = None) -> list[PostingRead
     but leaves the postings already recorded, and dropping or failing on those would delete
     history the user can no longer recover.
 
-    ``region`` is classified here rather than stored, so that correcting the list of spellings
-    that place a posting in Israel takes effect on every posting already swept instead of only on
-    those swept afterwards.
+    ``region`` is classified here rather than stored, so that correcting the profile's list of
+    local spellings takes effect on every posting already swept instead of only on those swept
+    afterwards.
 
     Args:
         status: Restricts the list to open or to closed postings; both are returned if omitted.
@@ -97,7 +98,7 @@ async def list_postings(status: PostingStatus | None = None) -> list[PostingRead
             ats=posting.ats,
             title=posting.title,
             location=posting.location_raw,
-            region=region(posting.location_raw),
+            region=region(posting.location_raw, profile),
             url=posting.url,
             status=posting.status,
             first_seen_at=posting.first_seen_at,

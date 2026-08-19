@@ -1,4 +1,4 @@
-"""Scoring a posting's description against the stack actually worked in.
+"""Scoring a posting's description against the stack a profile says is known.
 
 The title says what a role is called. The description says what it is built with and how much
 experience it wants, and those are the two questions that decide whether applying is worth the
@@ -13,90 +13,23 @@ familiar words appear elsewhere in the text.
 
 The vocabulary therefore has to include technologies that are *not* known. A list of only the
 familiar ones would find familiar words in every posting and score them all perfectly.
+
+Which technologies sit on each side is a fact about a person, not about this module, so both
+vocabularies arrive in a ``Profile``. It is passed as an argument rather than read from
+``app.profile``: reading the loaded default would leave the scoring functions with no honest way
+to be asked about a different search, and being able to score the same description under two
+profiles is the whole reason the profile exists. Passing it also keeps these functions pure —
+same description, same profile, same answer — so a test needs no monkeypatching and no import
+order to say what it means. The cost is one argument threaded from ``sweep`` and ``main``, which
+are the only places that read the default at all.
 """
 
 import re
+from collections.abc import Mapping
 
 from pydantic import BaseModel
 
-KNOWN = {
-    "python": r"python",
-    "typescript": r"typescript|\bts\b",
-    "javascript": r"javascript|\bjs\b",
-    "sql": r"\bsql\b",
-    "fastapi": r"fastapi",
-    "node": r"node\.?js|\bnode\b",
-    "express": r"express\.?js|\bexpress\b",
-    "rest": r"\brest(ful)?\b|rest api",
-    "rabbitmq": r"rabbitmq",
-    "microservices": r"micro[- ]?services?",
-    "react": r"\breact\b",
-    "redux": r"redux",
-    "mongodb": r"mongo(db)?",
-    "neo4j": r"neo4j|cypher",
-    "postgresql": r"postgres(ql)?",
-    "kubernetes": r"kubernetes|\bk8s\b",
-    "helm": r"\bhelm\b",
-    "argocd": r"argo\s?cd|argocd",
-    "docker": r"docker",
-    "ci/cd": r"ci/?cd|github actions",
-    "aws": r"\baws\b|amazon web services",
-    "observability": r"opentelemetry|coralogix|observability",
-    "pytest": r"pytest",
-    "llm": r"\bllm\b|large language model|openai|prompt engineering|\bgenai\b",
-}
-"""Technologies with real production experience behind them, and how each is written about.
-
-Patterns rather than plain words because postings spell these many ways — "Node.js", "NodeJS" and
-"Node", or "K8s" for Kubernetes. Short forms are anchored on word boundaries so that "ts" does not
-match inside "artifacts".
-"""
-
-UNKNOWN = {
-    "java": r"\bjava\b",
-    "go": r"\bgolang\b|\bgo\b(?= developer| engineer| programming)",
-    "c#": r"\bc#|\.net\b",
-    "ruby": r"\bruby\b|rails",
-    "php": r"\bphp\b",
-    "rust": r"\brust\b",
-    "c++": r"c\+\+",
-    "scala": r"\bscala\b",
-    "kotlin": r"\bkotlin\b",
-    "swift": r"\bswift\b",
-    "angular": r"angular",
-    "vue": r"\bvue(\.js)?\b",
-    "django": r"django",
-    "flask": r"\bflask\b",
-    "spring": r"spring boot|\bspring\b",
-    "kafka": r"\bkafka\b",
-    "spark": r"\bspark\b",
-    "hadoop": r"hadoop",
-    "airflow": r"airflow",
-    "snowflake": r"snowflake",
-    "databricks": r"databricks",
-    "terraform": r"terraform",
-    "ansible": r"ansible",
-    "jenkins": r"jenkins",
-    "gcp": r"\bgcp\b|google cloud",
-    "azure": r"\bazure\b",
-    "elasticsearch": r"elastic ?search",
-    "graphql": r"graphql",
-    "mysql": r"\bmysql\b",
-    "cassandra": r"cassandra",
-    "unity": r"\bunity\b",
-    "android": r"\bandroid\b",
-    "ios": r"\bios\b|swiftui",
-    "embedded": r"\bembedded\b|\brtos\b",
-}
-"""Technologies a posting may demand that are not part of the stack.
-
-These exist so that a score means something. Without them every posting that says "Python" once
-would score 100%, no matter how much Java, Kafka and Spark surrounded it.
-
-Deliberately unforgiving in one place: "Go" is matched only where it is followed by developer,
-engineer or programming, because the bare word appears in ordinary English in every posting ever
-written.
-"""
+from app.profile import Profile
 
 YEARS = re.compile(
     r"(\d+)\s*(?:\+|-|–|to)?\s*(?:\d+)?\s*\+?\s*years?(?:\s+of)?"
@@ -105,6 +38,10 @@ YEARS = re.compile(
     re.I,
 )
 """How a posting states the experience it wants.
+
+Stays in source while the vocabularies moved into the profile, because this is a fact about how
+English job adverts are written rather than about any one person's search. What varies between
+searches is how many years are too many, and that is ``max_years`` in the profile.
 
 Only the leading number is captured. A posting asking for "3-5 years" is asking for three; the
 upper bound is what they hope for, and treating the range as five would discard a role that is
@@ -133,9 +70,9 @@ class TechMatch(BaseModel):
     """The lowest number of years the posting asks for, or None if it never says."""
 
 
-def _found(vocabulary: dict[str, str], text: str) -> list[str]:
+def _found(vocabulary: Mapping[str, re.Pattern[str]], text: str) -> list[str]:
     """Returns the vocabulary entries whose pattern appears in the text."""
-    return [name for name, pattern in vocabulary.items() if re.search(pattern, text, re.I)]
+    return [name for name, pattern in vocabulary.items() if pattern.search(text)]
 
 
 def minimum_years(description: str) -> int | None:
@@ -143,6 +80,9 @@ def minimum_years(description: str) -> int | None:
 
     A description often states several requirements — three years with one technology, five with
     another. The smallest is the one that decides whether applying is plausible.
+
+    Takes no profile: it reports what the posting says, and whether that is too much is
+    ``fits_stack``'s question.
 
     Args:
         description: The posting body as plain text.
@@ -154,18 +94,19 @@ def minimum_years(description: str) -> int | None:
     return min(stated) if stated else None
 
 
-def tech_match(description: str) -> TechMatch:
-    """Scores a description against the known stack.
+def tech_match(description: str, profile: Profile) -> TechMatch:
+    """Scores a description against the stack a profile knows.
 
     Args:
         description: The posting body as plain text.
+        profile: The search being run, supplying both technology vocabularies.
 
     Returns:
         Which technologies were recognised on each side, the resulting share, and the experience
         bar if the posting states one.
     """
-    matched = _found(KNOWN, description)
-    missing = _found(UNKNOWN, description)
+    matched = _found(profile.known, description)
+    missing = _found(profile.unknown, description)
     named = len(matched) + len(missing)
     return TechMatch(
         matched=matched,

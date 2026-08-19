@@ -18,204 +18,103 @@ someone a year into their career and there is nothing to weigh up. The reverse d
 title with no marker proves nothing, and plenty of what survives still asks for years of
 experience in a body this module never reads. Sorting those out needs the description, which is a
 separate step.
+
+What counts as in reach, as the right kind of role, and as too senior are all facts about the
+person searching, so every one of them arrives in a ``Profile`` passed to these functions. They
+never import the loaded default: a filter that reached for a module-level profile could only ever
+answer for one search, and the point of the profile is that the same posting can be judged under
+two. As arguments they stay pure functions of their inputs, which is what lets the tests below
+run the whole gate under a profile the repository has never seen. ``sweep`` and ``main`` read the
+default once and pass it down.
 """
 
-import re
 from collections.abc import Sequence
-from enum import StrEnum
 
 from app.boards import BoardPosting
+from app.profile import Profile
 from app.schemas import Region
 from app.stack import tech_match
 
-MIN_TECH_SCORE = 0.8
-"""The share of a posting's named technologies that must already be known.
 
-Chosen from the data rather than picked as a round number: across one full sweep, 80% left seven
-postings, 70% left twelve and 60% left twenty. Seven is a shortlist a person actually reads.
-
-Lowering it is the first thing to try when a sweep produces nothing — the constant exists to be
-turned, and the stored descriptions mean every posting can be rescored without fetching anything.
-"""
-
-MAX_YEARS = 3
-"""The most years of experience a posting may ask for.
-
-Compared against the *lowest* figure a posting states, so a role wanting "3-5 years" is treated
-as wanting three and survives.
-"""
-
-ISRAEL_FRAGMENTS = (
-    "israel",
-    "tel aviv",
-    "tel-aviv",
-    "tlv",
-    "herzliya",
-    "herzlia",
-    "ramat gan",
-    "petah tikva",
-    "netanya",
-    "ra'anana",
-    "raanana",
-    "hod hasharon",
-    "jerusalem",
-    "haifa",
-    "rehovot",
-    "beer sheva",
-    "be'er sheva",
-    "yokneam",
-    "caesarea",
-    "kfar saba",
-    "or yehuda",
-    "rosh ha'ayin",
-)
-"""Lower-case fragments that place a posting in Israel.
-
-Cities are listed individually rather than trusting the country name, because the boards write
-locations as free text and disagree with each other: the same city arrives as "Tel Aviv", "Tel
-Aviv District, Israel", "Tel Aviv-Yafo, Gush Dan, Israel" and "TLV". Across one sweep that was 243
-distinct strings, and roughly half the Israeli postings never name the country at all.
-"""
-
-REMOTE_FRAGMENTS = ("remote", "work from home", "anywhere")
-"""Fragments that make a posting worth keeping regardless of the country attached to it.
-
-A remote role advertised from elsewhere may still be open to Israel. Deciding that needs the
-description read, so it is kept here rather than dropped now.
-"""
-
-SENIOR = re.compile(
-    r"\b(senior|sr\.?|staff|principal|lead|leader|head|director|vp|chief|architect|"
-    r"manager|expert|iii|iv)\b",
-    re.I,
-)
-"""Titles that state the role is beyond someone early in their career.
-
-Leadership words count as seniority markers rather than job families: a team lead, an engineering
-manager and a principal engineer are all roles the posting itself puts out of reach, whatever
-family they otherwise belong to.
-
-Roman numerals are included because levelled titles ("Engineer III") say the same thing in a
-different alphabet. Bare "V" is deliberately absent — a single letter matches too much for what it
-would buy.
-"""
-
-
-class RoleFamily(StrEnum):
-    """The kinds of role worth surfacing, chosen to match the stack actually worked in.
-
-    A whitelist rather than a subtraction. Naming the families that fit is both narrower and more
-    honest than matching every title containing "engineer" and then listing exceptions: QA,
-    automation, data, security, IT, embedded and game roles are all engineering, none of them are
-    a match, and as a whitelist they simply never appear rather than needing to be excluded one
-    by one as they are discovered.
-    """
-
-    FULLSTACK = "fullstack"
-    BACKEND = "backend"
-    FRONTEND = "frontend"
-    PLATFORM = "platform"
-    SOFTWARE = "software"
-
-
-FAMILY_PATTERNS: dict[RoleFamily, re.Pattern[str]] = {
-    RoleFamily.FULLSTACK: re.compile(r"\bfull[ -]?stack\b", re.I),
-    RoleFamily.BACKEND: re.compile(
-        r"\b(back[ -]?end|server[ -]?side|python (developer|engineer)|"
-        r"node(\.js)? (developer|engineer))\b",
-        re.I,
-    ),
-    RoleFamily.FRONTEND: re.compile(r"\b(front[ -]?end|react (developer|engineer))\b", re.I),
-    RoleFamily.PLATFORM: re.compile(
-        r"\b(devops|dev ?sec ?ops|sre|site reliability|platform engineer|"
-        r"infrastructure engineer|cloud engineer)\b",
-        re.I,
-    ),
-    RoleFamily.SOFTWARE: re.compile(
-        r"\b(software (engineer|developer)|sw engineer|programmer)\b",
-        re.I,
-    ),
-}
-"""How each family is recognised in a title.
-
-Iterated in declaration order and the first match wins, so the order is the tie-break for titles
-that answer to more than one pattern: "Full Stack Software Engineer" is reported as full stack,
-which describes it better than software does.
-
-Every pattern requires its family word to be doing real work in the title. Bare "engineer" and
-bare "developer" are deliberately never enough on their own — they are exactly the words that let
-"Solutions Engineer", "Sales Engineer", "Developer Advocate" and "Product Manager, Developer
-Experience" through when the filter was a subtraction rather than a whitelist.
-"""
-
-
-def in_scope_location(location: str) -> bool:
+def in_scope_location(location: str, profile: Profile) -> bool:
     """Whether a location is somewhere worth seeing a job in.
 
     Args:
         location: The raw location text as the board wrote it.
+        profile: The search being run, supplying the local and remote fragments.
 
     Returns:
-        True for Israel and for anything advertised as remote.
+        True for the profile's own region and for anything advertised as remote.
     """
     text = location.lower()
-    return any(fragment in text for fragment in ISRAEL_FRAGMENTS + REMOTE_FRAGMENTS)
+    return any(
+        fragment in text for fragment in profile.local_fragments + profile.remote_fragments
+    )
 
 
-def region(location: str) -> Region:
+def region(location: str, profile: Profile) -> Region:
     """Which region a location places a posting in.
 
     Only ever asked of a stored posting, which has already passed ``in_scope_location``. A
-    location naming nowhere in Israel is therefore in storage because it advertised as remote,
-    which is why remote is the fallback rather than a case matched in its own right — an
-    unrecognised Israeli spelling shows up as a remote role rather than as no answer at all.
+    location naming nowhere local is therefore in storage because it advertised as remote, which
+    is why remote is the fallback rather than a case matched in its own right — an unrecognised
+    local spelling shows up as a remote role rather than as no answer at all.
 
-    Israel wins where a location says both. "Remote — Tel Aviv" is a role that can be worked from
-    home *in Israel*, and calling it remote would drop it out of the count of what is reachable
-    locally, which is the count this field exists to make possible.
+    Local wins where a location says both. "Remote — Tel Aviv" is a role that can be worked from
+    home *where the searcher lives*, and calling it remote would drop it out of the count of what
+    is reachable locally, which is the count this field exists to make possible.
+
+    ``Region.ISRAEL`` is the profile's local region under whatever name that region has. The
+    member keeps its name because those two strings are the API's published contract and the
+    dashboard filters on them; renaming it would be a change to the wire, not to this module.
 
     Args:
         location: The raw location text as the board wrote it.
+        profile: The search being run, supplying the local fragments.
 
     Returns:
-        ``Region.ISRAEL`` if the text names anywhere in Israel, ``Region.REMOTE`` otherwise.
+        ``Region.ISRAEL`` if the text names anywhere local, ``Region.REMOTE`` otherwise.
     """
     text = location.lower()
-    if any(fragment in text for fragment in ISRAEL_FRAGMENTS):
+    if any(fragment in text for fragment in profile.local_fragments):
         return Region.ISRAEL
     return Region.REMOTE
 
 
-def role_family(title: str) -> RoleFamily | None:
+def role_family(title: str, profile: Profile) -> str | None:
     """Which family of role a title describes, if any.
 
     Args:
         title: The posting's title as the board wrote it.
+        profile: The search being run, supplying the families and how each is recognised.
 
     Returns:
-        The best-fitting family, or None if the title is not a role worth surfacing. None is the
-        common answer: most of what a board lists is something else entirely.
+        The name the profile gives the best-fitting family, or None if the title is not a role
+        worth surfacing. None is the common answer: most of what a board lists is something else
+        entirely. The families are tried in the order the profile writes them and the first match
+        wins, so a title answering to two is reported as the one listed first.
     """
-    for family, pattern in FAMILY_PATTERNS.items():
+    for family, pattern in profile.role_families.items():
         if pattern.search(title):
             return family
     return None
 
 
-def states_seniority(title: str) -> bool:
-    """Whether a title says outright that the role is beyond someone early in their career.
+def states_seniority(title: str, profile: Profile) -> bool:
+    """Whether a title says outright that the role is beyond the level being searched for.
 
     Args:
         title: The posting's title as the board wrote it.
+        profile: The search being run, supplying the seniority markers.
 
     Returns:
         True only where the title states it. A title carrying no marker returns False, which means
         the title is silent on the question — not that the role is junior.
     """
-    return bool(SENIOR.search(title))
+    return bool(profile.seniority_markers.search(title))
 
 
-def fits_stack(description: str) -> bool:
+def fits_stack(description: str, profile: Profile) -> bool:
     """Whether a posting's body describes work that is actually a match.
 
     Two questions, both answered from the text: is most of what they name already known, and is
@@ -228,17 +127,18 @@ def fits_stack(description: str) -> bool:
 
     Args:
         description: The posting body as plain text.
+        profile: The search being run, supplying both vocabularies and both bars.
 
     Returns:
         True if the posting clears both bars.
     """
-    match = tech_match(description)
-    if match.score is None or match.score < MIN_TECH_SCORE:
+    match = tech_match(description, profile)
+    if match.score is None or match.score < profile.min_tech_score:
         return False
-    return match.minimum_years is None or match.minimum_years <= MAX_YEARS
+    return match.minimum_years is None or match.minimum_years <= profile.max_years
 
 
-def relevant(postings: Sequence[BoardPosting]) -> list[BoardPosting]:
+def relevant(postings: Sequence[BoardPosting], profile: Profile) -> list[BoardPosting]:
     """Keeps the postings worth storing and discards the rest.
 
     The title gates run first and the description gate last, because the title tests are a regex
@@ -248,6 +148,7 @@ def relevant(postings: Sequence[BoardPosting]) -> list[BoardPosting]:
 
     Args:
         postings: Everything one board returned.
+        profile: The search being run, applied by every gate.
 
     Returns:
         Those located in reach, belonging to one of the role families, not marked senior, and
@@ -256,8 +157,8 @@ def relevant(postings: Sequence[BoardPosting]) -> list[BoardPosting]:
     return [
         posting
         for posting in postings
-        if in_scope_location(posting.location_raw)
-        and role_family(posting.title) is not None
-        and not states_seniority(posting.title)
-        and fits_stack(posting.description)
+        if in_scope_location(posting.location_raw, profile)
+        and role_family(posting.title, profile) is not None
+        and not states_seniority(posting.title, profile)
+        and fits_stack(posting.description, profile)
     ]
