@@ -30,10 +30,10 @@ PAYLOAD = {
 }
 """One valid application: exactly the fields with no default, and nothing a client may not send.
 
-Shared because six test files needed the same thing and each carried its own copy, which meant a
-new required field had to be added in six places or five files would start failing for a reason
-none of them is about. It doubles as document keyword arguments, since the fields a client must
-supply are the same ones the document has no default for.
+Shared because every application test needs the same thing and each file used to carry its own
+copy, which meant a new required field had to be added in as many places or the rest would start
+failing for a reason none of them is about. It doubles as document keyword arguments, since the
+fields a client must supply are the same ones the document has no default for.
 
 Tests that care about one field override it at the call site rather than editing this.
 """

@@ -55,12 +55,8 @@ class BoardPosting(BaseModel):
     description: str = ""
     """The posting body as plain text, with any markup stripped.
 
-    All three systems return this in the same response as the listing, so reading it costs no
-    extra request — only a larger payload. It is what the technologies and the years of
-    experience are named in; the title says neither.
-
-    Defaults to empty because a board may omit it, and an absent description must not be
-    mistaken for one that mentions nothing.
+    All three systems return it alongside the listing, so reading it costs no extra request. It
+    names the technologies and the years; the title says neither.
     """
 
 
@@ -81,10 +77,8 @@ class SweepResult(BaseModel):
 def _plain_text(markup: str) -> str:
     """Turns a posting body into plain text.
 
-    Greenhouse returns HTML with its entities escaped a second time, so the entities are unescaped
-    twice before tags are removed — once for the outer escaping, once for the markup itself.
-    Skipping either leaves literal ``&lt;p&gt;`` in the text, which no keyword then matches
-    across.
+    Greenhouse double-escapes its entities, so they are unescaped twice before tags are stripped.
+    Skipping either pass leaves literal ``&lt;p&gt;`` that no keyword matches across.
 
     Args:
         markup: The body as the board returned it, HTML or plain.
@@ -209,20 +203,13 @@ async def reconcile(
 ) -> SweepResult:
     """Records one board reading against what was stored from previous readings.
 
-    A posting present on the board is either new, or one already known whose ``last_seen_at`` moves
-    forward. Its title, URL and location are refreshed at the same time, because boards edit
-    postings in place and the stored copy should describe the role as it stands.
+    A posting still listed moves ``last_seen_at`` forward and has its title, URL and location
+    refreshed, because boards edit postings in place. One that is absent has its miss counter
+    raised and closes at ``MISSES_BEFORE_CLOSED``; one already closed is left alone; one that
+    reappears is reopened rather than duplicated.
 
-    A posting absent from the board has its miss counter raised, and closes once the counter
-    reaches ``MISSES_BEFORE_CLOSED``. Already-closed postings are left alone, so a role that closed
-    weeks ago is not repeatedly rewritten.
-
-    A closed posting that reappears is reopened rather than left closed or duplicated: the same
-    identifier returning means the board is listing it again, whether it was relisted or the
-    earlier absences were a board fault.
-
-    Everything is timestamped from a single ``now`` so that one sweep produces one instant, rather
-    than a spread that makes ordering within the sweep look meaningful.
+    Everything is timestamped from a single ``now``, so one sweep produces one instant rather than
+    a spread that makes ordering within it look meaningful.
 
     Args:
         company: The company whose board was read.
@@ -334,14 +321,12 @@ def candidate_tokens(name: str) -> list[str]:
 async def resolve(name: str, client: httpx.AsyncClient) -> list[BoardMatch]:
     """Finds which boards, if any, a company name resolves to.
 
-    Every candidate is tried against every system rather than stopping at the first hit, because
-    a token can answer on two systems at once and nothing in these payloads identifies the company
-    well enough to pick between them. That judgement is left to a person, so this reports and does
-    not store.
+    Every candidate is tried against every system rather than stopping at the first hit: a token
+    can answer on two systems, and nothing in these payloads says which company it is. That
+    judgement is a person's, so this reports and does not store.
 
-    A 404 is these APIs' way of saying no such board, and is the only status read as absence. Any
-    other error status is a fault, and is raised rather than quietly recorded as "no board" —
-    which would drop a company off the watchlist for the lifetime of an outage.
+    A 404 is the only status read as absence. Any other error is raised rather than recorded as
+    "no board", which would drop a company off the watchlist for the length of an outage.
 
     Args:
         name: The company name to resolve.
@@ -369,13 +354,9 @@ async def resolve(name: str, client: httpx.AsyncClient) -> list[BoardMatch]:
 async def watch(name: str, match: BoardMatch) -> Company:
     """Puts a confirmed board on the watchlist, or returns the entry already there.
 
-    Idempotent on the ATS and token together, which is the pair the unique index enforces and the
-    pair that identifies a board. Re-running a seed list, or resolving a company that was added
-    months ago, must not create a second entry or reset the sweep history on the first — a company
-    whose ``last_swept_at`` silently went back to null would re-seed its whole board as new.
-
-    The name is only a label, so an entry that already exists keeps the name it was stored with
-    rather than being rewritten by whatever spelling resolved it this time.
+    Idempotent on ATS and token together — the pair the unique index enforces. Re-running a seed
+    list must not reset ``last_swept_at``, which would re-seed the whole board as new. An existing
+    entry keeps the name it was stored with; the name is only a label.
 
     Args:
         name: The company name to label the entry with, used only if it is being created.
