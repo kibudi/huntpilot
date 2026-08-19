@@ -4,18 +4,11 @@ from datetime import UTC, datetime
 from http import HTTPStatus
 from typing import Any
 
+from conftest import PAYLOAD
 from httpx import AsyncClient
 from pymongo import AsyncMongoClient
 
 from app.models import Application
-
-PAYLOAD = {
-    "company": "Gong",
-    "role": "Backend Engineer",
-    "location": "Remote (IL)",
-    "source": "LinkedIn",
-    "url": "https://example.com/jobs/1",
-}
 
 
 async def test_creates_and_returns_the_stored_application(

@@ -3,25 +3,11 @@
 from http import HTTPStatus
 from typing import Any
 
+from conftest import create
 from httpx import AsyncClient
 from pymongo import AsyncMongoClient
 
-PAYLOAD = {
-    "company": "Gong",
-    "role": "Backend Engineer",
-    "location": "Remote (IL)",
-    "source": "LinkedIn",
-    "url": "https://example.com/jobs/1",
-}
-
 MISSING_ID = "6a6f000000000000000000ff"
-
-
-async def create(api: AsyncClient, **overrides: Any) -> dict[str, Any]:
-    """Creates one application and returns the response body."""
-    response = await api.post("/api/applications", json=PAYLOAD | overrides)
-    body: dict[str, Any] = response.json()
-    return body
 
 
 async def test_removes_the_application(
