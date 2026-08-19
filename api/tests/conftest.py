@@ -1,4 +1,4 @@
-"""Shared test fixtures.
+"""Shared test fixtures, and the one application every test file starts from.
 
 Beanie has no in-memory backend: ``init_beanie`` must run against a real server before a Document
 can even be constructed. Tests therefore need a live MongoDB and run against a throwaway database,
@@ -20,6 +20,23 @@ from app.db import DOCUMENT_MODELS, init_db
 from app.main import app
 
 TEST_DB = "huntpilot_test"
+
+PAYLOAD = {
+    "company": "Gong",
+    "role": "Backend Engineer",
+    "location": "Remote (IL)",
+    "source": "LinkedIn",
+    "url": "https://example.com/jobs/1",
+}
+"""One valid application: exactly the fields with no default, and nothing a client may not send.
+
+Shared because six test files needed the same thing and each carried its own copy, which meant a
+new required field had to be added in six places or five files would start failing for a reason
+none of them is about. It doubles as document keyword arguments, since the fields a client must
+supply are the same ones the document has no default for.
+
+Tests that care about one field override it at the call site rather than editing this.
+"""
 
 
 @pytest.fixture
@@ -49,3 +66,22 @@ async def api(db: AsyncMongoClient[dict[str, Any]]) -> AsyncIterator[AsyncClient
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
+
+
+async def create(api: AsyncClient, **overrides: Any) -> dict[str, Any]:
+    """Creates one application over the API and returns the response body.
+
+    For the tests whose subject is what happens *after* a document exists. Tests about the create
+    endpoint itself post explicitly instead, since going through a helper would hide the request
+    they are making assertions about.
+
+    Args:
+        api: The client bound to the app.
+        **overrides: Fields to change on ``PAYLOAD`` before posting it.
+
+    Returns:
+        The created application as the API returned it.
+    """
+    response = await api.post("/api/applications", json=PAYLOAD | overrides)
+    body: dict[str, Any] = response.json()
+    return body

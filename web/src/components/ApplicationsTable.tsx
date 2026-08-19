@@ -2,7 +2,9 @@ import { exactTime, relativeTime } from "../format";
 import type { RowState } from "../state";
 import { STATUSES, type Application, type Status } from "../types";
 import { StatusSelect } from "./StatusSelect";
+import { SortableHeader, sortRows, type Column } from "./table";
 
+/** The columns an application can be ordered by. */
 export type SortKey =
   | "company"
   | "role"
@@ -12,25 +14,24 @@ export type SortKey =
   | "applied_date"
   | "updated_at";
 
+/** Which column the applications are ordered by, and which way. */
 export interface Sort {
   key: SortKey;
   ascending: boolean;
 }
 
-const COLUMNS: { key: SortKey | null; label: string }[] = [
+/** The headings, in the order they are shown. The last two sort nothing. */
+const COLUMNS: Column<SortKey>[] = [
   { key: "company", label: "Company" },
   { key: "role", label: "Role" },
   { key: "location", label: "Location" },
   { key: "source", label: "Source" },
-  { key: "status", label: "Status" },
-  { key: "applied_date", label: "Applied" },
-  { key: "updated_at", label: "Updated" },
+  { key: "status", label: "Status", descendingFirst: true },
+  { key: "applied_date", label: "Applied", descendingFirst: true },
+  { key: "updated_at", label: "Updated", descendingFirst: true },
   { key: null, label: "Notes" },
   { key: null, label: "" },
 ];
-
-/** Columns that read most usefully newest-first when first selected. */
-const DESCENDING_FIRST: SortKey[] = ["status", "applied_date", "updated_at"];
 
 /** Returns the value a row is ordered by, with status mapped to its pipeline position. */
 function sortValue(application: Application, key: SortKey): string | number {
@@ -38,37 +39,20 @@ function sortValue(application: Application, key: SortKey): string | number {
   return application[key] ?? "";
 }
 
-/**
- * Orders applications by the active sort.
- *
- * Rows missing the sort value always sink to the bottom regardless of direction: an unapplied job
- * has no date, and that is absence of data rather than an early one.
- */
+/** Orders applications by the active sort. */
 export function sortApplications(
   applications: Application[],
   sort: Sort,
 ): Application[] {
-  const direction = sort.ascending ? 1 : -1;
-
-  return [...applications].sort((left, right) => {
-    const a = sortValue(left, sort.key);
-    const b = sortValue(right, sort.key);
-
-    if (a === "" && b === "") return 0;
-    if (a === "") return 1;
-    if (b === "") return -1;
-    if (typeof a === "number" && typeof b === "number") {
-      return (a - b) * direction;
-    }
-    return String(a).localeCompare(String(b)) * direction;
-  });
+  return sortRows(applications, sort, sortValue);
 }
 
-/** The default direction when a column is first selected. */
-export function defaultAscending(key: SortKey): boolean {
-  return !DESCENDING_FIRST.includes(key);
-}
-
+/**
+ * The pipeline: every tracked application, one row each.
+ *
+ * The status pill and the delete button live in the row itself rather than behind a menu, because
+ * moving a job along is the thing this screen exists to do and it should cost one click.
+ */
 export function ApplicationsTable({
   applications,
   sort,
@@ -90,52 +74,14 @@ export function ApplicationsTable({
   emptyMessage: string;
   onAdd: () => void;
 }) {
-  function toggle(key: SortKey) {
-    onSortChange(
-      key === sort.key
-        ? { key, ascending: !sort.ascending }
-        : { key, ascending: defaultAscending(key) },
-    );
-  }
-
   return (
     <div className="overflow-auto rounded-lg border border-line bg-panel">
       <table className="w-full min-w-[1180px] border-collapse text-left">
-        <thead className="sticky top-0 z-10 bg-panel">
-          <tr>
-            {COLUMNS.map(({ key, label }) => (
-              <th
-                key={label}
-                scope="col"
-                aria-sort={
-                  key === sort.key
-                    ? sort.ascending
-                      ? "ascending"
-                      : "descending"
-                    : undefined
-                }
-                className="border-b border-line px-3.5 py-2.5 text-[11px] font-semibold tracking-[0.04em] text-ink-dim uppercase"
-              >
-                {key ? (
-                  <button
-                    type="button"
-                    onClick={() => toggle(key)}
-                    className="cursor-pointer tracking-[0.04em] uppercase hover:text-ink focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
-                  >
-                    {label}
-                    {key === sort.key && (
-                      <span className="ml-1 text-accent">
-                        {sort.ascending ? "▲" : "▼"}
-                      </span>
-                    )}
-                  </button>
-                ) : (
-                  label
-                )}
-              </th>
-            ))}
-          </tr>
-        </thead>
+        <SortableHeader
+          columns={COLUMNS}
+          sort={sort}
+          onSortChange={onSortChange}
+        />
         <tbody>
           {applications.length === 0 ? (
             <tr>
@@ -168,6 +114,12 @@ export function ApplicationsTable({
   );
 }
 
+/**
+ * One application.
+ *
+ * The company name is the posting link where there is one, and plain text where there is not —
+ * an application can be logged without a url, and a link to nowhere is worse than no link.
+ */
 function Row({
   application,
   state,

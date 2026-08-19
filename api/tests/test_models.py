@@ -4,23 +4,16 @@ from datetime import UTC, date
 from typing import Any
 
 import pytest
+from conftest import PAYLOAD
 from pydantic import ValidationError
 from pymongo import AsyncMongoClient
 
 from app.models import Application, Status
 
-REQUIRED = {
-    "company": "Gong",
-    "role": "Backend Engineer",
-    "location": "Remote (IL)",
-    "source": "LinkedIn",
-    "url": "https://example.com/jobs/1",
-}
-
 
 async def test_applies_defaults(db: AsyncMongoClient[dict[str, Any]]) -> None:
     """A document created with only the required fields is complete."""
-    saved = await Application(**REQUIRED).insert()
+    saved = await Application(**PAYLOAD).insert()
 
     assert saved.status is Status.SAVED
     assert saved.notes == ""
@@ -31,7 +24,7 @@ async def test_applies_defaults(db: AsyncMongoClient[dict[str, Any]]) -> None:
 async def test_rejects_unknown_status(db: AsyncMongoClient[dict[str, Any]]) -> None:
     """A status outside the enum is refused before it reaches the database."""
     with pytest.raises(ValidationError):
-        Application(**REQUIRED | {"status": "banana"})
+        Application(**PAYLOAD | {"status": "banana"})
 
 
 async def test_rejects_misspelled_field(db: AsyncMongoClient[dict[str, Any]]) -> None:
@@ -40,7 +33,7 @@ async def test_rejects_misspelled_field(db: AsyncMongoClient[dict[str, Any]]) ->
     This is the failure mode a schemaless database would otherwise accept: the document would save
     with a `comapny` key and every later query on `company` would miss it.
     """
-    fields = REQUIRED | {"comapny": "Gong"}
+    fields = PAYLOAD | {"comapny": "Gong"}
     del fields["company"]
 
     with pytest.raises(ValidationError):
@@ -49,7 +42,7 @@ async def test_rejects_misspelled_field(db: AsyncMongoClient[dict[str, Any]]) ->
 
 async def test_stores_status_as_plain_string(db: AsyncMongoClient[dict[str, Any]]) -> None:
     """Status persists as its lowercase value, so raw mongosh queries match."""
-    await Application(**REQUIRED | {"status": Status.APPLIED}).insert()
+    await Application(**PAYLOAD | {"status": Status.APPLIED}).insert()
 
     raw = await Application.get_pymongo_collection().find_one({})
 
@@ -64,7 +57,7 @@ async def test_applied_date_round_trips(db: AsyncMongoClient[dict[str, Any]]) ->
     therefore have to use datetimes rather than a date string.
     """
     await Application(
-        **REQUIRED | {"status": Status.APPLIED, "applied_date": date(2026, 7, 15)}
+        **PAYLOAD | {"status": Status.APPLIED, "applied_date": date(2026, 7, 15)}
     ).insert()
 
     fetched = await Application.find_one({})
@@ -83,7 +76,7 @@ async def test_timestamps_are_utc(db: AsyncMongoClient[dict[str, Any]]) -> None:
     Without it a consumer in any non-UTC zone reads the value as local time and computes an age
     hours wrong.
     """
-    await Application(**REQUIRED).insert()
+    await Application(**PAYLOAD).insert()
 
     fetched = await Application.find_one({})
 

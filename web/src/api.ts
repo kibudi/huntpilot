@@ -1,4 +1,27 @@
-import type { Application, ApplicationCreate, Status } from "./types";
+import type {
+  Application,
+  ApplicationCreate,
+  Posting,
+  PostingStatus,
+  Status,
+} from "./types";
+
+/**
+ * A failed request, carrying the status code alongside the message.
+ *
+ * The code is kept because not every rejection is a failure to the caller: tracking a posting the
+ * API already holds comes back 409, and that is the state the user asked for rather than an
+ * error. Deciding that by matching the message text would break the moment the wording changes.
+ */
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
 
 /**
  * Calls the API and returns the raw response, throwing on any non-2xx.
@@ -25,7 +48,7 @@ async function send(path: string, init?: RequestInit): Promise<Response> {
         : Array.isArray(detail) && detail[0]?.msg
           ? `${detail[0].loc?.slice(1).join(".") ?? ""} ${detail[0].msg}`.trim()
           : `Request failed (${response.status})`;
-    throw new Error(message);
+    throw new ApiError(message, response.status);
   }
 
   return response;
@@ -39,6 +62,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 /** Fetches every tracked application, most recently updated first. */
 export function listApplications(): Promise<Application[]> {
   return request<Application[]>("/api/applications");
+}
+
+/**
+ * Fetches swept board postings, newest-discovered first.
+ *
+ * `status` narrows the list to open or closed postings; omitting it returns both. The board tab
+ * omits it deliberately — one request for everything lets the open/closed/all chips carry live
+ * counts and switch between them without a second round trip.
+ */
+export function listPostings(status?: PostingStatus): Promise<Posting[]> {
+  const query = status ? `?status=${status}` : "";
+  return request<Posting[]>(`/api/postings${query}`);
 }
 
 /** Tracks a new application. */

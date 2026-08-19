@@ -10,8 +10,9 @@ from fastapi import FastAPI, HTTPException
 from pymongo.errors import DuplicateKeyError
 
 from app.db import init_db
-from app.models import Application
-from app.schemas import ApplicationCreate, ApplicationRead, ApplicationUpdate
+from app.models import Application, Company, Posting, PostingStatus
+from app.relevance import region
+from app.schemas import ApplicationCreate, ApplicationRead, ApplicationUpdate, PostingRead
 
 
 @asynccontextmanager
@@ -50,6 +51,61 @@ async def list_applications() -> list[ApplicationRead]:
     """
     documents = await Application.find_all().sort("-updated_at").to_list()
     return [ApplicationRead.model_validate(document) for document in documents]
+
+
+@app.get("/api/postings")
+async def list_postings(status: PostingStatus | None = None) -> list[PostingRead]:
+    """Returns postings swept from company boards, most recently discovered first.
+
+    The sort key is ``first_seen_at`` rather than ``last_seen_at`` because this list answers "what
+    has appeared", and every successful sweep bumps ``last_seen_at`` on every posting still listed
+    — sorting on it would reshuffle the whole list after each sweep and bury a genuinely new
+    opening under roles that have been up for months.
+
+    Omitting ``status`` returns open and closed postings together, since a closed posting is the
+    result the tracker exists to produce and hiding it by default would make the feature look
+    empty.
+
+    Company display names are read in one query and matched in Python. Looking each one up per
+    posting would issue a query per row, which grows with the board's size for data that repeats
+    once per company. The watchlist is the small side of that join, so reading it whole costs one
+    round trip regardless of how many postings come back.
+
+    A posting whose company is no longer on the watchlist falls back to its token as the display
+    name. This is a real state, not a corruption: removing a company stops its board being swept
+    but leaves the postings already recorded, and dropping or failing on those would delete
+    history the user can no longer recover.
+
+    ``region`` is classified here rather than stored, so that correcting the list of spellings
+    that place a posting in Israel takes effect on every posting already swept instead of only on
+    those swept afterwards.
+
+    Args:
+        status: Restricts the list to open or to closed postings; both are returned if omitted.
+
+    Returns:
+        The matching postings, newest discovery first.
+    """
+    query = Posting.find_all() if status is None else Posting.find(Posting.status == status)
+    postings = await query.sort("-first_seen_at").to_list()
+    companies = await Company.find_all().to_list()
+    names = {(company.ats, company.token): company.name for company in companies}
+    return [
+        PostingRead(
+            id=str(posting.id),
+            company=names.get((posting.ats, posting.company_token), posting.company_token),
+            ats=posting.ats,
+            title=posting.title,
+            location=posting.location_raw,
+            region=region(posting.location_raw),
+            url=posting.url,
+            status=posting.status,
+            first_seen_at=posting.first_seen_at,
+            last_seen_at=posting.last_seen_at,
+            closed_at=posting.closed_at,
+        )
+        for posting in postings
+    ]
 
 
 @app.post("/api/applications", status_code=HTTPStatus.CREATED)

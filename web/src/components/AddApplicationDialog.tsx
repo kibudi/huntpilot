@@ -2,6 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import type { DialogState } from "../state";
 import { STATUSES, type ApplicationCreate, type Status } from "../types";
 
+/**
+ * An empty form.
+ *
+ * Every field is a string, including the date and the status, because that is what an `<input>`
+ * hands back. The conversion to what the API wants happens once, on submit.
+ */
 const BLANK = {
   company: "",
   role: "",
@@ -13,13 +19,20 @@ const BLANK = {
   notes: "",
 };
 
-/** Required fields, with the labels the form shows, so a validation message names what the user sees. */
+/**
+ * Required fields, with the labels the form shows, so a validation message names what the user
+ * sees.
+ *
+ * The posting URL is deliberately absent. Plenty of real applications start from a referral, a
+ * recruiter message or an ad that has since been taken down, and there is no link to paste; the
+ * API stores those with an empty url, which is why its uniqueness rule only covers rows that have
+ * one. Demanding a link here would make this form the one path that cannot record them.
+ */
 const REQUIRED: { field: keyof typeof BLANK; label: string }[] = [
   { field: "company", label: "Company" },
   { field: "role", label: "Role" },
   { field: "location", label: "Location" },
   { field: "source", label: "Source" },
-  { field: "url", label: "Posting URL" },
 ];
 
 /**
@@ -145,7 +158,6 @@ export function AddApplicationDialog({
           />
           <Field
             label="Posting URL"
-            required
             placeholder="https://"
             value={fields.url}
             onChange={(value) => setFields({ ...fields, url: value })}
@@ -220,6 +232,13 @@ export function AddApplicationDialog({
   );
 }
 
+/**
+ * One labelled input.
+ *
+ * `required` draws the asterisk and nothing else — the native attribute is left off so the
+ * browser cannot block submission with its own message, and `REQUIRED` above is what is actually
+ * enforced. A field marked here has to be listed there too.
+ */
 function Field({
   ref,
   label,

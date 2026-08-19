@@ -161,9 +161,8 @@
         <tr><td>company / role / location</td><td>string</td><td></td></tr>
         <tr><td>source</td><td>string</td><td>LinkedIn, RemoteOK, referral…</td></tr>
         <tr><td>url</td><td>string</td><td>link to the posting</td></tr>
-        <tr><td>status</td><td>enum</td><td>saved → applied → interview → closed</td></tr>
+        <tr><td>status</td><td>enum</td><td>saved → applied → interview → offer / rejected / <span class="muted">ghosted</span></td></tr>
         <tr><td>applied_date</td><td>date?</td><td>null while still saved</td></tr>
-        <tr><td>outcome</td><td>enum?</td><td>offer / rejected / <span class="muted">ghosted</span></td></tr>
         <tr><td>notes</td><td>text</td><td></td></tr>
       </table>
     </section>
@@ -222,24 +221,65 @@
       </div>
       <p>One step at a time. Each one runs before the next one starts.</p>
       <p class="footnote">Deliberately app-first: containerising something that doesn't work yet just hides the bugs.</p>
+      <p class="footnote">The board tracker is being built out of order, between 5 and 4 — the worker needs something real to run, and this is it.</p>
+    </section>
+
+    <section>
+      <h2>The part that isn't a tracker</h2>
+      <p class="lead">Job boards tell you what is open today. Nobody records what <span class="accent">changed</span>.</p>
+      <ul>
+        <li>The role I applied to has <b>disappeared</b> — it is filled. Stop waiting on it.</li>
+        <li>Applied 30 days ago and the posting is <b>still live</b> — silence is not rejection.</li>
+        <li>Same job <b>reposted</b> every six weeks — churn, or a spec nobody can meet.</li>
+      </ul>
+      <p class="footnote">None of these are answerable from a single snapshot. They need board state stored over time and joined against the application log — which this project already has. That join is the differentiator.</p>
+    </section>
+
+    <section>
+      <h2>The sweep</h2>
+      <p>Three systems publish a company's open roles as JSON — no key, no scraping: <span class="accent">Greenhouse</span>, <span class="accent">Lever</span>, <span class="accent">Ashby</span>.</p>
+      <table>
+        <tr><th>gate</th><th>what it drops</th><th>cost</th></tr>
+        <tr><td>0–1 &nbsp;fetch + normalise</td><td class="muted">three payload shapes into one</td><td class="good">free</td></tr>
+        <tr><td>2 &nbsp;reconcile</td><td class="muted">nothing — this gate <b>is</b> the product</td><td class="good">free</td></tr>
+        <tr><td>3 &nbsp;location</td><td>279 → 78</td><td class="good">free</td></tr>
+        <tr><td>5 &nbsp;title <span class="muted">(whitelist of five role families)</span></td><td>290 → 30</td><td class="good">free</td></tr>
+        <tr><td>5b &nbsp;stack + years <span class="muted">(reads the description)</span></td><td>30 → 7</td><td class="good">free</td></tr>
+        <tr><td class="muted">4 &nbsp;dedupe · 6 &nbsp;judge</td><td class="muted">designed, not built</td><td class="muted">—</td></tr>
+      </table>
+      <p class="footnote">Counts from one real sweep of 28 boards: 1,026 postings in, 7 out. The free gates already get to a shortlist, which is why the paid one has not been needed yet.</p>
+    </section>
+
+    <section>
+      <h2>Closure is inferred, never reported</h2>
+      <p>A board never announces that a role was filled. The entry simply stops coming back.</p>
+      <ul>
+        <li>One document per posting for its whole life — a sweep bumps <code>last_seen_at</code>, it does not append. The collection grows with the market, not with time.</li>
+        <li>Boards intermittently omit live entries, so <b>two consecutive misses</b> are required before anything is called closed. Crying wolf here would be worse than saying nothing.</li>
+        <li>A company name is resolved to a board token by guessing — 29 of 69 names answered. <code>vast</code> turned out to be a rocket company in California, not the Israeli storage one, so a human confirms before a board joins the watchlist.</li>
+      </ul>
+      <p class="footnote">Design note: <code>docs/board-tracker.md</code>.</p>
     </section>
 
     <section>
       <h2>Where we are</h2>
       <ul>
         <li><span class="status-done">✓</span> Repo, stack and conventions locked in <code>CLAUDE.md</code></li>
-        <li><span class="status-done">✓</span> Data model pinned</li>
-        <li><span class="status-done">✓</span> This deck</li>
-        <li><span class="status-done">✓</span> Beanie <code>Application</code> document, verified against Atlas</li>
-        <li><span class="status-now">▸</span> <b>Step 1</b> — FastAPI, <code>GET /api/applications</code></li>
-        <li><span class="status-todo">·</span> Step 2 — React + Vite dashboard against that API</li>
+        <li><span class="status-done">✓</span> <b>Step 1</b> — FastAPI: 6 endpoints, verified against Atlas</li>
+        <li><span class="status-done">✓</span> <b>Step 2</b> — React + Vite dashboard against that API</li>
+        <li><span class="status-done">✓</span> <b>Step 5</b> — Docker Compose: the whole app up with one command</li>
+        <li><span class="status-done">✓</span> <b>Board tracker</b> — reader, reconciler, resolver, relevance filter, <code>GET /api/postings</code> and a Board tab; <b>28 boards</b> swept</li>
+        <li><span class="status-now">▸</span> CI on every push, and the sweep on a schedule</li>
+        <li><span class="status-todo">·</span> Next — the digest, then the Discord bot</li>
+        <li><span class="status-todo">·</span> Then — Discord bot, kind, Actions, Terraform</li>
       </ul>
       <p class="footnote">This deck lives at <code>docs/plan.html</code> and gets updated as steps land.</p>
     </section>
 
     <section class="center">
-      <h2 class="accent">Step 1 next:</h2>
-      <p class="lead">the API.</p>
+      <h2 class="accent">Next:</h2>
+      <p class="lead">put the sweep on a schedule.</p>
+      <p class="footnote">Which is what finally gives the Celery worker something real to do.</p>
     </section>
 
   </div>

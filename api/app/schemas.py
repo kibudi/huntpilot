@@ -7,14 +7,39 @@ optional and forces clients into null checks that can never be true.
 """
 
 from datetime import date, datetime
+from enum import StrEnum
 from typing import Annotated, ClassVar
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, model_validator
 
-from app.models import Status
+from app.models import ATS, PostingStatus, Status
 
 ObjectIdStr = Annotated[str, BeforeValidator(str)]
-"""A MongoDB ObjectId rendered as a string, since JSON has no such type."""
+"""A MongoDB ObjectId rendered as a string, since JSON has no such type.
+
+The validator converts whatever arrives, which is what lets ``model_validate`` read the ObjectId
+straight off a document. The declared type is still ``str``, so a caller building the schema by
+keyword instead has to convert first — Beanie types ``id`` as ``PydanticObjectId | None`` and the
+type checker compares against the declaration, not the validator. The conversion at such a call
+site is therefore not redundant with this one.
+"""
+
+
+class Region(StrEnum):
+    """Where a posting can be worked from, as the API reports it.
+
+    Two values and no third, because only postings that passed ``in_scope_location`` are ever
+    stored: a location naming nowhere in Israel is in storage because it advertised as remote.
+    An "elsewhere" value would describe a posting the sweep never keeps.
+
+    It lives here rather than on the document because nothing stores it. It is derived from
+    ``location_raw`` on the way out, so that the one list of Israeli spellings stays in the
+    backend and clients count Israeli roles by reading a field rather than by re-implementing
+    the list and drifting from it.
+    """
+
+    ISRAEL = "israel"
+    REMOTE = "remote"
 
 
 class ApplicationCreate(BaseModel):
@@ -102,3 +127,42 @@ class ApplicationRead(BaseModel):
     notes: str
     created_at: datetime
     updated_at: datetime
+
+
+class PostingRead(BaseModel):
+    """A posting swept from a company's board, as returned by the API.
+
+    ``company`` is the watchlist entry's display name, not the ``company_token`` the posting
+    stores. The token is the company's slug inside its ATS — "catonetworks" rather than "Cato
+    Networks" — and it exists so a URL can be built, which is no reason to make a reader decode
+    it. ``location`` likewise drops the ``_raw`` of ``location_raw``: the suffix records that the
+    three boards format locations differently and nothing has normalised them, which is a storage
+    concern rather than something the field name should tell a client.
+
+    ``external_id``, ``company_token`` and ``missed_sweeps`` are deliberately absent. They are the
+    sweep's own bookkeeping — a board's internal identifier, the slug it is addressed by, and a
+    counter that only means anything between a posting's first absence and its closure — and
+    publishing them would invite clients to depend on mechanics that exist precisely so they can
+    change.
+
+    ``region`` is derived from the same ``location_raw`` that ``location`` reports verbatim. Both
+    are published because they answer different questions: the raw text is what a reader wants to
+    see, while the region is what a client filters and counts on, and deriving one from the other
+    client-side means every client keeping its own copy of the spellings that place a posting in
+    Israel.
+
+    ``closed_at`` is the only nullable field: a posting still listed has not closed, so there is
+    no instant to report. Every other field is present on any stored posting.
+    """
+
+    id: ObjectIdStr
+    company: str
+    ats: ATS
+    title: str
+    location: str
+    region: Region
+    url: str
+    status: PostingStatus
+    first_seen_at: datetime
+    last_seen_at: datetime
+    closed_at: datetime | None

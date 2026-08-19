@@ -2,18 +2,11 @@
 
 from typing import Any
 
+from conftest import PAYLOAD
 from httpx import AsyncClient
 from pymongo import AsyncMongoClient
 
 from app.models import Application, Status
-
-REQUIRED = {
-    "company": "Gong",
-    "role": "Backend Engineer",
-    "location": "Remote (IL)",
-    "source": "LinkedIn",
-    "url": "https://example.com/jobs/1",
-}
 
 
 async def test_id_is_exposed_as_id_not_underscore_id(
@@ -24,7 +17,7 @@ async def test_id_is_exposed_as_id_not_underscore_id(
     Regression test: returning the document directly leaked MongoDB's own key, so the JSON said
     `_id` while the model documented `id`, and a client reading the docstring got undefined.
     """
-    saved = await Application(**REQUIRED).insert()
+    saved = await Application(**PAYLOAD).insert()
 
     item = (await api.get("/api/applications")).json()[0]
 
@@ -34,7 +27,7 @@ async def test_id_is_exposed_as_id_not_underscore_id(
 
 async def test_id_is_a_string(api: AsyncClient, db: AsyncMongoClient[dict[str, Any]]) -> None:
     """The identifier serialises as a string, since JSON has no ObjectId type."""
-    await Application(**REQUIRED).insert()
+    await Application(**PAYLOAD).insert()
 
     item = (await api.get("/api/applications")).json()[0]
 
@@ -45,7 +38,7 @@ async def test_no_internal_fields_leak(
     api: AsyncClient, db: AsyncMongoClient[dict[str, Any]]
 ) -> None:
     """Only the declared fields are returned, so Beanie internals stay out of the contract."""
-    await Application(**REQUIRED).insert()
+    await Application(**PAYLOAD).insert()
 
     item = (await api.get("/api/applications")).json()[0]
 
@@ -93,9 +86,9 @@ async def test_applied_date_is_the_only_nullable_field(
     api: AsyncClient, db: AsyncMongoClient[dict[str, Any]]
 ) -> None:
     """applied_date is null until a job is applied to; nothing else is ever null."""
-    await Application(**REQUIRED).insert()
+    await Application(**PAYLOAD).insert()
     await Application(
-        **REQUIRED | {"url": "https://example.com/jobs/2", "status": Status.APPLIED},
+        **PAYLOAD | {"url": "https://example.com/jobs/2", "status": Status.APPLIED},
         applied_date=None,
     ).insert()
 
