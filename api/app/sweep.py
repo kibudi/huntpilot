@@ -1,25 +1,13 @@
 """Reading every watched board in one pass, on a schedule and by hand.
 
-This is the loop the rest of the board tracker was written for. ``fetch_board``, ``relevant`` and
-``reconcile`` each do one thing to one board; nothing until now put them in order or ran them over
-the watchlist, so every sweep so far has been a throwaway script.
+Boards are read serially, sharing one client. A sweep runs every six hours against a few dozen
+public APIs, so nothing is waiting on it, and a serial pass keeps one board's failure local.
 
-One HTTP client serves the whole pass. Each board is a separate host, but the client also carries
-the timeout and redirect policy, and building one per company would scatter that policy across
-however many companies happen to be watched.
-
-Boards are read one after another rather than concurrently. A sweep runs every six hours against a
-few dozen public APIs, so nothing is waiting on it, and a serial pass keeps the failure of one
-board a local event instead of one branch of a gather that has to be unpicked afterwards.
-
-The failure rule matters more than anything else here. Closure is inferred from absence — a board
-that stops listing a posting is how this system learns the role is gone — so a board that could
-not be read must produce *no* reconcile at all. Handing ``reconcile`` an empty list because a
-fetch failed would report every one of that company's open roles as heading for closed, and two
-such sweeps would close them outright. That is why the failure path below records and continues
-without touching storage, and why the fetch and the reconcile sit in one ``try`` rather than the
-fetch alone: anything that can go wrong before a board reading is known-good has to land in the
-same place.
+The failure rule matters more than anything else here. Closure is inferred from absence, so a
+board that could not be read must produce *no* reconcile at all — handing ``reconcile`` an empty
+list after a failed fetch would report every one of that company's roles as heading for closed.
+Hence the fetch and the reconcile share one ``try``: anything that can go wrong before a board
+reading is known-good has to land in the same place.
 """
 
 import asyncio
@@ -76,18 +64,12 @@ class SweepSummary(BaseModel):
 async def sweep(client: httpx.AsyncClient) -> SweepSummary:
     """Reads every watched board, stores what is worth storing, and reports what changed.
 
-    A board that raises for any reason — a wrong token answering 404, an outage, a timeout, a
-    payload that does not have the shape its system documents — is counted as a failure and the
-    pass moves to the next company. ``Exception`` is caught rather than the HTTP errors alone
-    because the aim is that no single company can end the sweep, and the ways a board can
-    disappoint are not confined to one library. ``BaseException`` is deliberately not caught, so a
-    cancelled sweep still stops.
-
-    The client is passed in rather than opened here so that one pass shares one connection pool,
-    and so tests can hand in a transport instead of reaching the network.
+    ``Exception`` is caught rather than the HTTP errors alone, because no single company may end
+    the sweep and the ways a board can disappoint are not confined to one library.
+    ``BaseException`` is deliberately not caught, so a cancelled sweep still stops.
 
     Args:
-        client: An HTTP client to read every board with.
+        client: An HTTP client to read every board with, shared across the pass.
 
     Returns:
         Totals across the boards that answered, plus a record of the ones that did not.
@@ -122,9 +104,8 @@ async def sweep(client: httpx.AsyncClient) -> SweepSummary:
 async def _connected_sweep() -> SweepSummary:
     """Opens everything one sweep needs, sweeps, and closes it again.
 
-    Separate from ``sweep`` so that the loop itself owns no connections: tests drive ``sweep``
-    against a database a fixture already opened, while the scheduled and manual entry points come
-    through here and get a connection of their own.
+    Separate from ``sweep`` so the loop owns no connections: tests drive ``sweep`` against a
+    database a fixture already opened.
     """
     db_client = await init_db()
     try:
@@ -137,14 +118,10 @@ async def _connected_sweep() -> SweepSummary:
 def run_sweep() -> SweepSummary:
     """Runs one complete sweep from synchronous code.
 
-    Celery tasks are ordinary synchronous functions and the sweep is async, so something has to
-    bridge the two. ``asyncio.run`` per sweep is that bridge, in preference to keeping a loop alive
-    between tasks: the Mongo client and the connection pools underneath it are bound to the loop
-    they were created on, so a client cached across tasks would be reused from a loop it does not
-    belong to, and a worker that forks — which is Celery's default — would inherit that loop into
-    children that must not share it. Opening and closing everything inside one ``asyncio.run``
-    makes each sweep self-contained, and at one sweep every six hours the setup cost is not worth a
-    thought.
+    ``asyncio.run`` per sweep, rather than a loop kept alive between tasks: the Mongo client and
+    its pools are bound to the loop that created them, and Celery forks by default, so a cached
+    client would be inherited into children that must not share it. At one sweep every six hours
+    the setup cost is irrelevant.
 
     Returns:
         What the sweep did.
@@ -155,10 +132,8 @@ def run_sweep() -> SweepSummary:
 def main() -> None:
     """Runs one sweep on demand and prints the summary.
 
-    The manual counterpart to the scheduled task, reached with ``python -m app.sweep``. It exists
-    because a reader with no Redis and no worker running still needs a way to see the thing work,
-    and because a sweep is the obvious first thing to reach for when the stored postings look
-    wrong.
+    Reached with ``python -m app.sweep``, so a reader with no Redis and no worker can still see
+    the thing work.
     """
     print(run_sweep().model_dump_json(indent=2))
 
