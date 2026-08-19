@@ -1,0 +1,85 @@
+name: CI
+
+# Runs on every push and pull request. The API and the dashboard are checked independently
+# because they fail for unrelated reasons and one should not hide the other.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  api:
+    name: api — ruff, mypy, pytest
+    runs-on: ubuntu-latest
+
+    # Beanie has no in-memory backend: init_beanie() must reach a real server before a Document
+    # can even be constructed, so the suite needs a database rather than a fixture. A standalone
+    # mongod is enough because nothing in the app uses transactions.
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1}).ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      MONGODB_URI: mongodb://127.0.0.1:27017
+      MONGODB_DB: huntpilot_ci
+
+    defaults:
+      run:
+        working-directory: api
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Lint
+        run: uv run ruff check app tests
+
+      - name: Type check
+        run: uv run mypy app tests
+
+      # The suite cannot run in parallel: init_beanie binds the document classes process-globally,
+      # so isolation comes from emptying collections between tests instead.
+      - name: Test
+        run: uv run pytest -q
+
+  web:
+    name: web — lint, build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # tsc -b runs first, so a type error fails the build rather than shipping a broken bundle.
+      - name: Build
+        run: npm run build
