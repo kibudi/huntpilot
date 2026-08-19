@@ -52,6 +52,59 @@ export const STATUS_COLOR: Record<Status, { c: number; h: number }> = {
   ghosted: { c: 0, h: 0 },
 };
 
+/**
+ * A job posting the board tracker swept from a company's job board, as the API returns it.
+ *
+ * Field names match the backend exactly. Nothing here is editable: the sweep owns every value,
+ * and the dashboard only reads them.
+ */
+export interface Posting {
+  id: string;
+  company: string;
+  ats: Ats;
+  title: string;
+  location: string;
+  url: string;
+  status: PostingStatus;
+  region: Region;
+  /** ISO timestamp of the sweep that first saw the posting. */
+  first_seen_at: string;
+  /** ISO timestamp of the most recent sweep that still saw it. */
+  last_seen_at: string;
+  /** ISO timestamp of the sweep that found it gone, or null while it is still listed. */
+  closed_at: string | null;
+}
+
+/** The board software a posting was swept from. */
+export type Ats = "greenhouse" | "lever" | "ashby";
+
+/**
+ * Where a posting places the job, as the storage layer decided it.
+ *
+ * The sweep stores `location` as raw text straight off each board, and the boards do not agree
+ * with each other: the same city arrives as "Tel Aviv", "Tel Aviv District, Israel", "Tel
+ * Aviv-Yafo, Gush Dan, Israel" and "TLV". Reading that text is the backend's job — it is the side
+ * that already has to decide, because a posting only gets stored if it lands somewhere worth
+ * looking at. The dashboard reads the verdict and never re-derives it: a second copy of the rule
+ * here would drift from the first, and the chips would quietly undercount the places the copy had
+ * not heard of.
+ */
+export type Region = "israel" | "remote";
+
+/** `null` means no region narrowing — every posting the sweep stored. */
+export type RegionFilter = Region | null;
+
+/** Regions offered as chips, in the order they appear. */
+export const REGIONS: Region[] = ["israel", "remote"];
+
+/**
+ * Whether a posting is still listed on the company's board.
+ *
+ * A posting is never deleted when it disappears — it is closed and kept, because how long a role
+ * stayed open is part of what the board tab is for.
+ */
+export type PostingStatus = "open" | "closed";
+
 /** Fields a client may supply when creating an application. */
 export interface ApplicationCreate {
   company: string;

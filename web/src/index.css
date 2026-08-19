@@ -3,6 +3,12 @@
 /*
  * Design tokens from the dashboard handoff. Colours are OKLCH so the status pills can be
  * generated from one lightness/chroma/hue pattern rather than hand-picked per state.
+ *
+ * The font stacks name only what the machine already has. They asked for Manrope and IBM Plex
+ * for a while without anything ever loading them, so every page rendered in the fallback and the
+ * declaration was a description of a design that was not on screen. Naming the fallback is
+ * honest, needs no network request, and leaves display and body distinguished by weight and
+ * tracking, which is where the difference was doing its work anyway.
  */
 @theme {
   --color-page: oklch(15% 0.005 250);
@@ -17,9 +23,9 @@
   --color-accent-bright: oklch(82% 0.14 250);
   --color-danger: oklch(65% 0.1 25);
 
-  --font-display: "Manrope", ui-sans-serif, system-ui, sans-serif;
-  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Code", monospace;
+  --font-display: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, monospace;
 }
 
 html,

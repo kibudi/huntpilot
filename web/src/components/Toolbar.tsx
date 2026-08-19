@@ -23,28 +23,11 @@ export function Toolbar({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2.5 py-4">
-      <label className="flex items-center gap-2 rounded-[7px] border border-line bg-panel px-2.5 py-1.5 focus-within:border-line-strong">
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          className="shrink-0 text-ink-faint"
-          aria-hidden="true"
-        >
-          <circle cx="11" cy="11" r="7" />
-          <path d="m20 20-3.5-3.5" strokeLinecap="round" />
-        </svg>
-        <input
-          value={query}
-          onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="Search company or role"
-          aria-label="Search company or role"
-          className="w-52 bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-faint"
-        />
-      </label>
+      <SearchField
+        value={query}
+        onChange={onQueryChange}
+        label="Search company or role"
+      />
 
       <Chip
         label="All"
@@ -85,8 +68,53 @@ export function Toolbar({
   );
 }
 
-/** One filter chip, showing a live count of matching applications. */
-function Chip({
+/**
+ * A magnifier-prefixed text field.
+ *
+ * Shared with the board toolbar, which needs two of them side by side. The label doubles as the
+ * placeholder so the field explains itself without a heading taking up a line above it.
+ */
+export function SearchField({
+  value,
+  onChange,
+  label,
+  icon,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  label: string;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <label className="flex items-center gap-2 rounded-[7px] border border-line bg-panel px-2.5 py-1.5 focus-within:border-line-strong">
+      {icon ?? (
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className="shrink-0 text-ink-faint"
+          aria-hidden="true"
+        >
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.5-3.5" strokeLinecap="round" />
+        </svg>
+      )}
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={label}
+        aria-label={label}
+        className="w-52 bg-transparent text-[13px] text-ink outline-none placeholder:text-ink-faint"
+      />
+    </label>
+  );
+}
+
+/** One filter chip, showing a live count of matching rows. */
+export function Chip({
   label,
   count,
   active,
