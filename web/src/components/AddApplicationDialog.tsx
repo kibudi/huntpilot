@@ -110,7 +110,7 @@ export function AddApplicationDialog({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-6"
-      style={{ background: "oklch(10% 0.01 250 / 65%)" }}
+      style={{ background: "oklch(28% 0.02 60 / 38%)" }}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !busy) onClose();
       }}

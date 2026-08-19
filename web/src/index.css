@@ -1,29 +1,41 @@
 @import "tailwindcss";
 
 /*
- * Design tokens from the dashboard handoff. Colours are OKLCH so the status pills can be
- * generated from one lightness/chroma/hue pattern rather than hand-picked per state.
+ * Design tokens.
  *
- * The font stacks name only what the machine already has. They asked for Manrope and IBM Plex
- * for a while without anything ever loading them, so every page rendered in the fallback and the
- * declaration was a description of a design that was not on screen. Naming the fallback is
- * honest, needs no network request, and leaves display and body distinguished by weight and
- * tracking, which is where the difference was doing its work anyway.
+ * Five colours carry the whole product: ink black for text, stormy teal for anything secondary,
+ * papaya whip for the page, vivid tangerine for the accent, and brandy where tangerine would be
+ * illegible. Backgrounds are warm rather than white so a tool someone keeps open beside a job
+ * board all day does not read as another grey admin console.
+ *
+ * Tangerine and brandy are both here on purpose. Tangerine is the fill — buttons, the active
+ * chip, the logo sweep — and goes under white text. Brandy is the same accent at text weight,
+ * for links and small labels where tangerine on a pale ground is too weak to read.
+ *
+ * ink-faint is stormy teal lightened against the page rather than a sixth colour, so the muted
+ * labels stay in the same family as the secondary text above them.
+ *
+ * Fraunces is the display face, shared with the landing page so the product and the page that
+ * describes it are recognisably the same thing. It carries the wordmark and the dialog titles and
+ * nothing else — a table of two hundred rows is read, not admired, and stays in the system sans
+ * that every machine already has. Georgia is named after it so the wordmark degrades to a serif
+ * rather than to whatever the body is using, if the font never arrives.
  */
 @theme {
-  --color-page: oklch(15% 0.005 250);
-  --color-panel: oklch(17% 0.005 250);
-  --color-raised: oklch(20% 0.006 250);
-  --color-line: oklch(26% 0.006 250);
-  --color-line-strong: oklch(30% 0.006 250);
-  --color-ink: oklch(92% 0.004 250);
-  --color-ink-dim: oklch(65% 0.006 250);
-  --color-ink-faint: oklch(50% 0.006 250);
-  --color-accent: oklch(75% 0.16 250);
-  --color-accent-bright: oklch(82% 0.14 250);
-  --color-danger: oklch(65% 0.1 25);
+  --color-page: #fffbf6;
+  --color-panel: #ffffff;
+  --color-raised: #fff4e3;
+  --color-line: #ffe5cc;
+  --color-line-strong: #ffca99;
+  --color-ink: #001524;
+  --color-ink-dim: #15616d;
+  --color-ink-faint: #7e9ea4;
+  --color-accent: #ff7d00;
+  --color-accent-ink: #b93f17;
+  --color-accent-bright: #cc6300;
+  --color-danger: #b93f17;
 
-  --font-display: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-display: Fraunces, Georgia, "Times New Roman", serif;
   --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, monospace;
 }

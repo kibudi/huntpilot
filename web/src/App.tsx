@@ -407,7 +407,7 @@ export default function App() {
       <header className="flex items-end justify-between gap-6 pb-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="h-3.5 w-3.5 rounded-[3px] bg-accent" />
+            <Logo />
             <h1 className="font-display text-lg font-extrabold tracking-tight">
               huntpilot
             </h1>
@@ -586,6 +586,49 @@ function Tabs({
  * The number is monospaced and the label is small and quiet, so a row of them reads as a set of
  * figures at a glance rather than as a sentence to be parsed.
  */
+/**
+ * The radar mark, inline rather than an `<img>`.
+ *
+ * The sweep arc is the product: a board read, read again, and the difference reported. Inline so
+ * it inherits `currentColor` for the rings and needs no second request for 700 bytes.
+ */
+function Logo() {
+  return (
+    <svg viewBox="0 0 64 64" className="h-[22px] w-[22px] text-ink" aria-hidden="true">
+      <defs>
+        <linearGradient
+          id="sweep"
+          x1="32"
+          y1="32"
+          x2="60"
+          y2="12"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop offset="0" stopColor="#ff7d00" stopOpacity="0.85" />
+          <stop offset="1" stopColor="#ff7d00" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <circle
+        cx="32"
+        cy="32"
+        r="27"
+        fill="none"
+        stroke="currentColor"
+        strokeOpacity="0.28"
+        strokeWidth="4"
+      />
+      <path d="M32 32 L32 5 A27 27 0 0 1 55.4 18.5 Z" fill="url(#sweep)" />
+      <path
+        d="M32 32 L55.4 18.5"
+        stroke="#ff7d00"
+        strokeWidth="4"
+        strokeLinecap="round"
+      />
+      <circle cx="44" cy="24" r="5" fill="#ff7d00" />
+    </svg>
+  );
+}
+
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="text-right">

@@ -44,11 +44,11 @@ export const STATUSES: Status[] = [
  * hand does not.
  */
 export const STATUS_COLOR: Record<Status, { c: number; h: number }> = {
-  saved: { c: 0.02, h: 240 },
-  applied: { c: 0.16, h: 250 },
-  interview: { c: 0.15, h: 300 },
-  offer: { c: 0.16, h: 145 },
-  rejected: { c: 0.09, h: 25 },
+  saved: { c: 0.02, h: 220 },
+  applied: { c: 0.09, h: 210 },
+  interview: { c: 0.09, h: 195 },
+  offer: { c: 0.11, h: 165 },
+  rejected: { c: 0.1, h: 40 },
   ghosted: { c: 0, h: 0 },
 };
 
