@@ -23,5 +23,6 @@ dist/
 Thumbs.db
 desktop.ini
 
-# Agent instructions, kept local
+# Agent instructions and working notes, kept local
 CLAUDE.md
+HANDOFF.md
