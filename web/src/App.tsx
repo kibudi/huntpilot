@@ -23,6 +23,7 @@ import {
   sortPostings,
   type PostingSort,
 } from "./components/PostingsTable";
+import { SweepPanel } from "./components/SweepPanel";
 import { Toolbar, type StatusFilter } from "./components/Toolbar";
 import { today } from "./format";
 import type {
@@ -413,14 +414,12 @@ export default function App() {
             </h1>
           </div>
           <p className="mt-1 text-xs text-ink-dim">
-            {tab === "applications"
-              ? "Every application, and what needs chasing."
-              : "Every role the sweep found, and how long it has been open."}
+            {SUBTITLES[tab]}
           </p>
         </div>
 
         <div className="flex gap-7">
-          {tab === "applications" ? (
+          {tab === "sweep" ? null : tab === "applications" ? (
             <>
               <Stat label="Tracked" value={applications.length} />
               <Stat label="Active" value={counts.applied + counts.interview} />
@@ -480,7 +479,7 @@ export default function App() {
             />
           )}
         </>
-      ) : (
+      ) : tab === "board" ? (
         <>
           <BoardToolbar
             query={boardQuery}
@@ -523,6 +522,8 @@ export default function App() {
             />
           )}
         </>
+      ) : (
+        <SweepPanel />
       )}
 
       <AddApplicationDialog
@@ -542,6 +543,18 @@ export default function App() {
 }
 
 /**
+ * The one-line description under the wordmark, per tab.
+ *
+ * A lookup rather than nested ternaries: with three tabs the conditional form stopped being
+ * readable, and a missing entry is now a type error rather than a blank line.
+ */
+const SUBTITLES: Record<Tab, string> = {
+  applications: "Every application, and what needs chasing.",
+  board: "Every role the sweep found, and how long it has been open.",
+  sweep: "Run a pass over the watchlist, and see what the last ones did.",
+};
+
+/**
  * The tab strip.
  *
  * Two buttons and a piece of state, not a router: the tabs are two views of one dashboard, and
@@ -557,6 +570,7 @@ function Tabs({
   const tabs: { id: Tab; label: string }[] = [
     { id: "applications", label: "Applications" },
     { id: "board", label: "Board" },
+    { id: "sweep", label: "Sweep" },
   ];
 
   return (

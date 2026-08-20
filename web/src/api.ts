@@ -4,6 +4,7 @@ import type {
   Posting,
   PostingStatus,
   Status,
+  SweepRun,
 } from "./types";
 
 /**
@@ -109,4 +110,29 @@ export function updateApplication(
  */
 export async function deleteApplication(id: string): Promise<void> {
   await send(`/api/applications/${id}`, { method: "DELETE" });
+}
+
+/**
+ * Starts one sweep of the watchlist.
+ *
+ * Answers as soon as the run is recorded, not when the pass is over — a sweep reads a few dozen
+ * boards and takes minutes. The run comes back in its running state with no summary, which is what
+ * gives the panel something to poll for from the first moment.
+ *
+ * A 409 is left to the caller to interpret rather than treated as a failure here: it means a sweep
+ * is already going, which is the state the user asked for.
+ */
+export function startSweep(): Promise<SweepRun> {
+  return request<SweepRun>("/api/sweeps", { method: "POST" });
+}
+
+/**
+ * Returns every recorded sweep, most recently started first.
+ *
+ * The whole history rather than a page of it, because sweeps run four times a day and the list is
+ * a few hundred small records a year. It is also how the panel watches a running sweep: the run
+ * being polled is the first entry.
+ */
+export function fetchSweeps(): Promise<SweepRun[]> {
+  return request<SweepRun[]>("/api/sweeps");
 }

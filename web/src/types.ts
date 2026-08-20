@@ -116,3 +116,56 @@ export interface ApplicationCreate {
   applied_date?: string | null;
   notes?: string;
 }
+
+/**
+ * One recorded pass over the watchlist, as the API returns it.
+ *
+ * Field names match the backend exactly. Nothing here is editable: a run is a record of something
+ * that happened, and the dashboard's only writes are starting one.
+ */
+export interface SweepRun {
+  id: string;
+  state: SweepState;
+  /** ISO timestamp of the moment the run was recorded, before the first board was read. */
+  started_at: string;
+  /** ISO timestamp of the moment it reached a final state, or null while it is still going. */
+  finished_at: string | null;
+  /** Null until the pass is over — a sweep on its first board and one that stored nothing differ. */
+  summary: SweepSummary | null;
+  /** Why the sweep as a whole failed, which is not the same as a board failing. */
+  error: string | null;
+}
+
+/**
+ * Where one recorded sweep got to.
+ *
+ * `completed` covers a pass in which individual boards failed: that is contained by design and
+ * already counted in the summary, so it is not a separate outcome.
+ */
+export type SweepState = "running" | "completed" | "failed" | "abandoned";
+
+/**
+ * What one pass did, as the API returns it.
+ *
+ * The posting counts are totals across the boards that were actually read, which is why
+ * `boards_failed` is shown beside them and never on its own: a sweep where half the boards failed
+ * produces small, honest-looking counts, and only the failure count says the sweep saw half the
+ * market.
+ */
+export interface SweepSummary {
+  boards_swept: number;
+  boards_failed: number;
+  added: number;
+  still_open: number;
+  closed: number;
+  reopened: number;
+  failures: BoardFailure[];
+}
+
+/** One board that could not be read during a sweep, and why. */
+export interface BoardFailure {
+  name: string;
+  ats: Ats;
+  token: string;
+  error: string;
+}

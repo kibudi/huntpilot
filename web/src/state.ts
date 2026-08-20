@@ -1,7 +1,7 @@
-import type { Application, Posting } from "./types";
+import type { Application, Posting, SweepRun } from "./types";
 
 /** Which tab the dashboard is showing. */
-export type Tab = "applications" | "board";
+export type Tab = "applications" | "board" | "sweep";
 
 /**
  * The screen's load state.
@@ -77,3 +77,44 @@ export type DialogState =
   | { kind: "submitting" }
   | { kind: "invalid"; message: string }
   | { kind: "failed"; message: string };
+
+/**
+ * Where the sweep panel is in the cycle of starting a pass and watching it.
+ *
+ * A state machine rather than a set of booleans because the UI polls: between asking for a sweep
+ * and seeing it finish there are several distinct waits, and each one shows something different.
+ * Booleans would allow starting-and-finished at once, and every render would have to work out
+ * which of them wins.
+ *
+ * `starting` is the request in flight, before there is a run id to name. `running` begins the
+ * moment the API answers with a run and lasts until a poll reports a final state — the API decides
+ * when it is over, never a timer here.
+ *
+ * `refused` is its own case rather than an error. A 409 means a sweep is already going, most often
+ * the scheduled one, and that is the state the user wanted rather than a failure of theirs; the
+ * next poll turns it into `running` against the pass that was already under way.
+ *
+ * `failed` is the request to start never landing. A sweep that ran and failed is a `finished` run
+ * carrying its own error, because it is a recorded outcome rather than something that went wrong
+ * in the browser.
+ */
+export type SweepState =
+  | { kind: "idle" }
+  | { kind: "starting" }
+  | { kind: "running"; runId: string }
+  | { kind: "refused"; message: string }
+  | { kind: "finished"; run: SweepRun }
+  | { kind: "failed"; message: string };
+
+/**
+ * The sweep history's load state.
+ *
+ * Separate from the run state above because the two answer different questions and fail
+ * independently: the history is worth showing even when a sweep could not be started, and a sweep
+ * is worth watching even on a first load where the history has not arrived yet.
+ */
+export type HistoryState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "error"; message: string }
+  | { kind: "ready"; runs: SweepRun[] };
