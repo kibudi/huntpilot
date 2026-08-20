@@ -162,7 +162,7 @@ function Row({
             type="button"
             onClick={onDismissError}
             title="Dismiss"
-            className="ml-2 text-xs text-danger hover:underline"
+            className="ml-2 text-xs text-danger-ink hover:underline"
           >
             {state.message} ✕
           </button>

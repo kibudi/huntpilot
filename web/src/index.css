@@ -3,17 +3,20 @@
 /*
  * Design tokens.
  *
- * Five colours carry the whole product: ink black for text, stormy teal for anything secondary,
- * papaya whip for the page, vivid tangerine for the accent, and brandy where tangerine would be
- * illegible. Backgrounds are warm rather than white so a tool someone keeps open beside a job
- * board all day does not read as another grey admin console.
+ * Five colours carry the whole product, and every one of them does a job:
  *
- * Tangerine and brandy are both here on purpose. Tangerine is the fill — buttons, the active
- * chip, the logo sweep — and goes under white text. Brandy is the same accent at text weight,
- * for links and small labels where tangerine on a pale ground is too weak to read.
+ * Regal Navy is the text and the strong edges. Lemon Chiffon is the page, warm rather than white
+ * so a tool kept open beside a job board all day does not read as another grey admin console.
+ * Royal Gold is the quiet structure — rules, chip fills, the resting state of anything selectable.
+ * Sandy Brown is the accent that fills: buttons, the active tab, the logo sweep. Tomato is the
+ * loudest and is spent sparingly, on what has gone wrong and on the hover that commits an action.
  *
- * ink-faint is stormy teal lightened against the page rather than a sixth colour, so the muted
- * labels stay in the same family as the secondary text above them.
+ * Gold and brown are both here rather than one orange, because a single accent has to be either
+ * legible as text or strong as a fill and cannot be both on a pale ground. Gold carries area,
+ * brown carries emphasis, and navy carries every word that has to be read.
+ *
+ * The surfaces are the page colour lifted and deepened rather than new hues, so that panels
+ * separate from the page without introducing a sixth colour that belongs to no one.
  *
  * Fraunces is the display face, shared with the landing page so the product and the page that
  * describes it are recognisably the same thing. It carries the wordmark and the dialog titles and
@@ -22,18 +25,20 @@
  * rather than to whatever the body is using, if the font never arrives.
  */
 @theme {
-  --color-page: #ffecd1;
-  --color-panel: #fff7ed;
-  --color-raised: #fff0da;
-  --color-line: #ffc574;
-  --color-line-strong: #ff9f17;
-  --color-ink: #001524;
-  --color-ink-dim: #15616d;
-  --color-ink-faint: #78290f;
-  --color-accent: #ff7d00;
-  --color-accent-ink: #78290f;
-  --color-accent-bright: #cc6300;
-  --color-danger: #78290f;
+  --color-page: #faf0ca;
+  --color-panel: #fdf8e6;
+  --color-raised: #f7e9b8;
+  --color-line: #f4d35e;
+  --color-line-strong: #ee964b;
+  --color-ink: #0d3b66;
+  --color-ink-dim: #2c5f8f;
+  --color-ink-faint: #b8541f;
+  --color-accent: #ee964b;
+  --color-accent-ink: #b8451c;
+  --color-accent-bright: #f95738;
+  --color-gold: #f4d35e;
+  --color-danger: #f95738;
+  --color-danger-ink: #c02e12;
 
   --font-display: Fraunces, Georgia, "Times New Roman", serif;
   --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;

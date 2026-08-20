@@ -60,12 +60,13 @@ export function ProfileForm() {
     return <p className="text-sm text-ink-dim">Loading the profile…</p>;
   }
   if (state.kind === "error") {
-    return <p className="text-sm text-danger">Could not load the profile — {state.message}</p>;
+    return <p className="text-sm text-danger-ink">Could not load the profile — {state.message}</p>;
   }
 
   const { draft } = state;
   const errors = state.kind === "rejected" ? state.errors : [];
   const busy = state.kind === "saving";
+  const loose = errors.filter((error) => !FIELDS.includes(error.field));
 
   return (
     <section className="flex flex-col gap-5">
@@ -155,7 +156,7 @@ export function ProfileForm() {
           type="button"
           onClick={() => void save()}
           disabled={busy}
-          className="rounded-md bg-accent px-4 py-2 font-medium text-page transition hover:bg-accent-bright disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-md bg-accent px-4 py-2 font-medium text-ink transition hover:bg-accent-bright disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy ? "Saving…" : "Save the profile"}
         </button>
@@ -164,15 +165,43 @@ export function ProfileForm() {
           <span className="text-sm text-ink-dim">Saved. The next sweep will use it.</span>
         )}
         {state.kind === "rejected" && (
-          <span className="text-sm text-danger">
+          <span className="text-sm text-danger-ink">
             Not saved — {state.errors.length} problem
-            {state.errors.length === 1 ? "" : "s"} below. The stored profile is unchanged.
+            {state.errors.length === 1 ? "" : "s"}. The stored profile is unchanged.
           </span>
         )}
       </div>
+
+      {loose.length > 0 && (
+        <ul className="rounded-md border border-danger bg-danger/10 p-3 text-sm text-danger-ink">
+          {loose.map((error) => (
+            <li key={`${error.field}:${error.detail}`}>{error.detail}</li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }
+
+/**
+ * The fields this form draws a box for.
+ *
+ * Anything the API complains about that is not one of these has nowhere to be shown next to, so it
+ * is listed on its own instead of being counted and then silently dropped. Two rejections are like
+ * that: a rule about the profile as a whole, such as naming no location at all, which pydantic
+ * reports with an empty path; and a field the profile does not have, which ``extra="forbid"``
+ * reports under the name that was misspelt.
+ */
+const FIELDS: string[] = [
+  "local_fragments",
+  "remote_fragments",
+  "seniority_markers",
+  "role_families",
+  "known",
+  "unknown",
+  "min_tech_score",
+  "max_years",
+];
 
 /** A titled group of fields. */
 function Panel({
@@ -210,7 +239,7 @@ function Field({
       {label && <span className="text-sm font-medium text-ink">{label}</span>}
       {hint && <span className="text-xs text-ink-dim">{hint}</span>}
       {children}
-      {error && <span className="text-xs text-danger">{error}</span>}
+      {error && <span className="text-xs text-danger-ink">{error}</span>}
     </label>
   );
 }
@@ -268,14 +297,14 @@ function ChipField({
         {value.map((word) => (
           <span
             key={word}
-            className="inline-flex items-center gap-1 rounded-full bg-accent/15 px-2 py-0.5 text-xs text-accent-ink"
+            className="inline-flex items-center gap-1 rounded-full bg-gold px-2 py-0.5 text-xs font-medium text-ink"
           >
             {word}
             <button
               type="button"
               onClick={() => onChange(value.filter((other) => other !== word))}
               aria-label={`Remove ${word}`}
-              className="cursor-pointer text-accent-ink/70 hover:text-danger"
+              className="cursor-pointer text-ink/60 hover:text-danger-ink"
             >
               ×
             </button>
@@ -310,9 +339,9 @@ function ChipField({
  * might write it. Both are editable, and a row can be removed outright, because which technologies
  * are worth scoring at all is as personal as how they are spelled.
  *
- * Renaming rebuilds the map rather than mutating a key, so the order entries were written in
- * survives an edit. For role families that order is not cosmetic: it is the tie-break when a title
- * answers to more than one family.
+ * Rows are keyed by position rather than by name. Keying by the name would make every keystroke in
+ * a rename a different React key, so the row would unmount and remount and the caret would leave
+ * the field after each character typed.
  */
 function VocabularyField({
   label,
@@ -332,16 +361,29 @@ function VocabularyField({
   const [fresh, setFresh] = useState("");
   const entries = Object.entries(value);
 
-  /** Rewrites the map, preserving order, with one entry renamed, replaced or dropped. */
-  function replace(at: string, name: string | null, words?: string[]) {
+  /**
+   * Renames one entry, refusing a name another entry already has.
+   *
+   * The refusal is the point. Rebuilding the map with a name that is already a key writes the
+   * renamed entry and then has it overwritten by the original owner of that name, so the map comes
+   * back one entry shorter with nothing on screen saying a vocabulary was dropped. Returning false
+   * lets the row put its own text back.
+   */
+  function rename(at: string, to: string): boolean {
+    if (to === at) return true;
+    if (to.length === 0 || to in value) return false;
+    const next: Record<string, string[]> = {};
+    for (const [key, terms] of entries) next[key === at ? to : key] = terms;
+    onChange(next);
+    return true;
+  }
+
+  /** Replaces one entry's words, or drops the entry when given nothing. */
+  function setWords(at: string, words: string[] | null) {
     const next: Record<string, string[]> = {};
     for (const [key, terms] of entries) {
-      if (key !== at) {
-        next[key] = terms;
-        continue;
-      }
-      if (name === null) continue;
-      next[name] = words ?? terms;
+      if (key !== at) next[key] = terms;
+      else if (words !== null) next[key] = words;
     }
     onChange(next);
   }
@@ -349,52 +391,116 @@ function VocabularyField({
   return (
     <Field label={label} hint={hint} error={error}>
       <div className="flex flex-col gap-2">
-        {entries.map(([name, words]) => (
-          <div key={name} className="flex flex-col gap-1 rounded-md border border-line bg-raised p-2">
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={name}
-                aria-label={`${keyLabel} name`}
-                onChange={(event) => replace(name, event.target.value)}
-                className="w-44 rounded border border-line bg-panel px-2 py-1 text-sm font-medium text-ink focus:outline-none focus:ring-2 focus:ring-accent"
-              />
-              <button
-                type="button"
-                onClick={() => replace(name, null)}
-                aria-label={`Remove ${name}`}
-                className="cursor-pointer text-xs text-ink-dim hover:text-danger"
-              >
-                remove
-              </button>
-            </div>
-            <ChipField
-              label=""
-              value={words}
-              onChange={(next) => replace(name, name, next)}
-            />
-          </div>
+        {entries.map(([name, words], index) => (
+          <VocabularyRow
+            key={index}
+            name={name}
+            words={words}
+            keyLabel={keyLabel}
+            onRename={(to) => rename(name, to)}
+            onWords={(next) => setWords(name, next)}
+            onRemove={() => setWords(name, null)}
+          />
         ))}
 
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={fresh}
-            placeholder={`add a ${keyLabel}…`}
-            onChange={(event) => setFresh(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key !== "Enter") return;
-              event.preventDefault();
-              const name = fresh.trim().toLowerCase();
-              if (name.length === 0 || name in value) return;
-              onChange({ ...value, [name]: [name] });
-              setFresh("");
-            }}
-            className="w-52 rounded-md border border-line bg-raised px-2 py-1 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent"
-          />
-        </div>
+        <input
+          type="text"
+          value={fresh}
+          placeholder={`add a ${keyLabel}…`}
+          onChange={(event) => setFresh(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            const name = fresh.trim().toLowerCase();
+            if (name.length === 0 || name in value) return;
+            onChange({ ...value, [name]: [name] });
+            setFresh("");
+          }}
+          className="w-52 rounded-md border border-line bg-raised px-2 py-1 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent"
+        />
       </div>
     </Field>
+  );
+}
+
+/**
+ * One named vocabulary: its name, its words, and a way to remove it.
+ *
+ * The name is held here as a draft and only committed when the field is left or Enter is pressed,
+ * rather than on every keystroke. Committing per character would rename the entry to every prefix
+ * of what is being typed, and each of those renames is a chance to collide with a name that
+ * already exists — so "pytest" on its way to "python" would be refused halfway through for
+ * matching nothing the user meant.
+ *
+ * A refused rename puts the original name back, because leaving the typed text in a field that did
+ * not take would show a vocabulary that is not the one being edited.
+ */
+function VocabularyRow({
+  name,
+  words,
+  keyLabel,
+  onRename,
+  onWords,
+  onRemove,
+}: {
+  name: string;
+  words: string[];
+  keyLabel: string;
+  onRename: (to: string) => boolean;
+  onWords: (words: string[]) => void;
+  onRemove: () => void;
+}) {
+  const [draft, setDraft] = useState(name);
+  const [clash, setClash] = useState(false);
+
+  useEffect(() => {
+    setDraft(name);
+    setClash(false);
+  }, [name]);
+
+  function commit() {
+    const to = draft.trim().toLowerCase();
+    if (to === name) return;
+    if (onRename(to)) return;
+    setDraft(name);
+    setClash(true);
+  }
+
+  return (
+    <div className="flex flex-col gap-1 rounded-md border border-line bg-raised p-2">
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={draft}
+          aria-label={`${keyLabel} name`}
+          onChange={(event) => setDraft(event.target.value)}
+          onBlur={commit}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              commit();
+            } else if (event.key === "Escape") {
+              setDraft(name);
+            }
+          }}
+          className="w-44 rounded border border-line bg-panel px-2 py-1 text-sm font-medium text-ink focus:outline-none focus:ring-2 focus:ring-accent"
+        />
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`Remove ${name}`}
+          className="cursor-pointer text-xs text-ink-dim hover:text-danger-ink"
+        >
+          remove
+        </button>
+        {clash && (
+          <span className="text-xs text-danger-ink">
+            that name is already used — kept “{name}”
+          </span>
+        )}
+      </div>
+      <ChipField label="" value={words} onChange={onWords} />
+    </div>
   );
 }
 

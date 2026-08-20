@@ -48,7 +48,7 @@ export function Toolbar({
       <button
         type="button"
         onClick={onAdd}
-        className="ml-auto flex items-center gap-1.5 rounded-[7px] bg-accent px-3.5 py-2 text-[13px] font-semibold text-page transition-colors hover:bg-accent-bright"
+        className="ml-auto flex items-center gap-1.5 rounded-[7px] bg-accent px-3.5 py-2 text-[13px] font-semibold text-ink transition-colors hover:bg-accent-bright hover:text-page"
       >
         <svg
           width="15"
@@ -132,7 +132,7 @@ export function Chip({
       aria-pressed={active}
       className={`rounded-full px-2.5 py-1.5 text-xs font-semibold capitalize transition-colors ${
         active
-          ? "bg-accent text-page"
+          ? "bg-accent text-ink"
           : "border border-line text-ink-dim hover:border-line-strong hover:text-ink"
       }`}
     >

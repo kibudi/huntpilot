@@ -18,6 +18,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
+import pymongo
 import pytest
 from httpx import AsyncClient
 from pymongo import AsyncMongoClient
@@ -126,19 +127,32 @@ async def test_every_stale_run_is_retired_not_only_the_first(
     do about it — the stuck lock the staleness rule exists to prevent.
 
     The index is dropped for the duration, because it is what makes this state unreachable now and
-    the state being tested is one only an older build could have written. The ``db`` fixture drops
-    the whole database afterwards, so nothing is left to restore.
+    the state being tested is one only an older build could have written. It is put back before the
+    assertions rather than left to the fixture: the fixture empties collections and no longer drops
+    the database, so the only thing that would restore it is ``init_beanie`` running again in the
+    next test — which would leave every test in between with the concurrency guard silently absent.
+    It goes back only after the assertions, since a unique index cannot be built over the duplicate
+    running runs this test exists to create.
     """
-    await SweepRun.get_pymongo_collection().drop_index("one_running_sweep")
-    await _stale_run()
-    await _stale_run()
-    live = await SweepRun().insert()
+    collection = SweepRun.get_pymongo_collection()
+    await collection.drop_index("one_running_sweep")
+    try:
+        await _stale_run()
+        await _stale_run()
+        live = await SweepRun().insert()
 
-    still_going = await running_run()
+        still_going = await running_run()
 
-    assert still_going is not None
-    assert still_going.id == live.id
-    assert await SweepRun.find(SweepRun.state == SweepState.ABANDONED).count() == 2
+        assert still_going is not None
+        assert still_going.id == live.id
+        assert await SweepRun.find(SweepRun.state == SweepState.ABANDONED).count() == 2
+    finally:
+        await collection.create_index(
+            [("state", pymongo.ASCENDING)],
+            name="one_running_sweep",
+            unique=True,
+            partialFilterExpression={"state": SweepState.RUNNING.value},
+        )
 
 
 async def test_a_live_run_is_not_retired(db: AsyncMongoClient[dict[str, Any]]) -> None:

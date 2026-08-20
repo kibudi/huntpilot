@@ -90,7 +90,7 @@ export function ApplicationsTable({
                 <button
                   type="button"
                   onClick={onAdd}
-                  className="mt-3 rounded-[7px] bg-accent px-3.5 py-2 text-[13px] font-semibold text-page hover:bg-accent-bright"
+                  className="mt-3 rounded-[7px] bg-accent px-3.5 py-2 text-[13px] font-semibold text-ink hover:bg-accent-bright"
                 >
                   Add your first application
                 </button>
@@ -155,7 +155,7 @@ function Row({
             type="button"
             onClick={onDismissError}
             title="Dismiss"
-            className="ml-2 text-xs text-danger hover:underline"
+            className="ml-2 text-xs text-danger-ink hover:underline"
           >
             {state.message} ✕
           </button>
@@ -195,7 +195,7 @@ function Row({
           disabled={state.kind === "saving"}
           title={`Delete ${application.company} — ${application.role}`}
           aria-label={`Delete ${application.company} — ${application.role}`}
-          className="cursor-pointer rounded px-1.5 text-ink-dim opacity-0 group-hover:opacity-100 hover:text-danger focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:opacity-0"
+          className="cursor-pointer rounded px-1.5 text-ink-dim opacity-0 group-hover:opacity-100 hover:text-danger-ink focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:opacity-0"
         >
           ✕
         </button>

@@ -77,7 +77,7 @@ export function ConfirmDeleteDialog({
         </p>
 
         {state.kind === "failed" && (
-          <p className="mt-3 text-xs text-danger" role="alert">
+          <p className="mt-3 text-xs text-danger-ink" role="alert">
             {state.message}
           </p>
         )}

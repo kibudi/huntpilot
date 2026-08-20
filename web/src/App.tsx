@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ApiError,
   createApplication,
@@ -103,9 +103,24 @@ export default function App() {
    *
    * A ref rather than the load state itself: the effect must not re-run when the state it sets
    * changes, or its cleanup would cancel the very request it just started. Cleared on failure, so
-   * leaving the tab and coming back is the retry.
+   * leaving the tab and coming back is the retry — and cleared again when a sweep finishes, since
+   * a completed pass is the one thing that changes the posting set while the page is open.
    */
   const boardRequested = useRef(false);
+
+  /**
+   * Marks the board as needing a fresh read after a sweep has finished.
+   *
+   * Fetching immediately would load a list the user is not looking at, so the postings are simply
+   * dropped and re-read the next time the tab is opened. Without this a user could run a sweep,
+   * watch it report twelve new postings, switch to the board and see none of them until they
+   * reloaded the page — a fetch that was only ever correct while nothing in the app could change
+   * what had been swept.
+   */
+  const boardIsStale = useCallback(() => {
+    boardRequested.current = false;
+    setBoard({ kind: "idle" });
+  }, []);
 
   useEffect(() => {
     if (tab !== "board" || boardRequested.current) return;
@@ -523,7 +538,7 @@ export default function App() {
           )}
         </>
       ) : (
-        <SweepPanel />
+        <SweepPanel onSwept={boardIsStale} />
       )}
 
       <AddApplicationDialog
@@ -618,8 +633,8 @@ function Logo() {
           y2="12"
           gradientUnits="userSpaceOnUse"
         >
-          <stop offset="0" stopColor="#ff7d00" stopOpacity="0.85" />
-          <stop offset="1" stopColor="#ff7d00" stopOpacity="0" />
+          <stop offset="0" stopColor="#ee964b" stopOpacity="0.85" />
+          <stop offset="1" stopColor="#ee964b" stopOpacity="0" />
         </linearGradient>
       </defs>
       <circle
@@ -634,11 +649,11 @@ function Logo() {
       <path d="M32 32 L32 5 A27 27 0 0 1 55.4 18.5 Z" fill="url(#sweep)" />
       <path
         d="M32 32 L55.4 18.5"
-        stroke="#ff7d00"
+        stroke="#ee964b"
         strokeWidth="4"
         strokeLinecap="round"
       />
-      <circle cx="44" cy="24" r="5" fill="#ff7d00" />
+      <circle cx="44" cy="24" r="5" fill="#ee964b" />
     </svg>
   );
 }
@@ -672,7 +687,7 @@ function Notice({
   return (
     <div
       className={`rounded-lg border border-line bg-panel px-4 py-10 text-center text-[13px] ${
-        tone === "danger" ? "text-danger" : "text-ink-dim"
+        tone === "danger" ? "text-danger-ink" : "text-ink-dim"
       }`}
     >
       {children}

@@ -205,7 +205,7 @@ export function AddApplicationDialog({
         </div>
 
         {(state.kind === "invalid" || state.kind === "failed") && (
-          <p className="mt-3 text-xs text-danger" role="alert">
+          <p className="mt-3 text-xs text-danger-ink" role="alert">
             {state.message}
           </p>
         )}
@@ -222,7 +222,7 @@ export function AddApplicationDialog({
           <button
             type="submit"
             disabled={busy}
-            className="rounded-[7px] bg-accent px-3.5 py-2 text-[13px] font-semibold text-page hover:bg-accent-bright disabled:opacity-50"
+            className="rounded-[7px] bg-accent px-3.5 py-2 text-[13px] font-semibold text-ink hover:bg-accent-bright disabled:opacity-50"
           >
             {busy ? "Saving…" : "Save"}
           </button>

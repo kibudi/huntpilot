@@ -42,13 +42,20 @@ export const STATUSES: Status[] = [
  *
  * Deriving both from one pattern keeps the six pills visually consistent; picking each colour by
  * hand does not.
+ *
+ * The hues are the product's own five and nothing else. Gold at rising chroma carries the early
+ * pipeline, so saved, applied and interview read as one warming ramp rather than three unrelated
+ * badges. Offer breaks out of that ramp into navy on purpose: it is the outcome worth spotting in
+ * a full table, and another warm pill would have sat beside interview instead of ending the run.
+ * Rejected is tomato, the loudest colour here and the only other place it is spent. Ghosted keeps
+ * no hue at all, because no answer is not an outcome.
  */
 export const STATUS_COLOR: Record<Status, { c: number; h: number }> = {
-  saved: { c: 0.03, h: 70 },
-  applied: { c: 0.07, h: 210 },
-  interview: { c: 0.1, h: 195 },
-  offer: { c: 0.12, h: 165 },
-  rejected: { c: 0.1, h: 35 },
+  saved: { c: 0.03, h: 92 },
+  applied: { c: 0.11, h: 92 },
+  interview: { c: 0.14, h: 55 },
+  offer: { c: 0.1, h: 252 },
+  rejected: { c: 0.18, h: 32 },
   ghosted: { c: 0, h: 0 },
 };
 

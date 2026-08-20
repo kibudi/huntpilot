@@ -16,10 +16,10 @@ const POLL_INTERVAL = 3000;
  * up here as a type error rather than as a run that silently renders unstyled.
  */
 const RUN_LOOK: Record<RunState, { label: string; className: string }> = {
-  running: { label: "Running", className: "bg-accent/20 text-accent-ink" },
-  completed: { label: "Completed", className: "bg-ink-dim/15 text-ink-dim" },
-  failed: { label: "Failed", className: "bg-danger/15 text-danger" },
-  abandoned: { label: "Abandoned", className: "bg-ink/10 text-ink-dim" },
+  running: { label: "Running", className: "bg-accent text-ink" },
+  completed: { label: "Completed", className: "bg-gold text-ink" },
+  failed: { label: "Failed", className: "bg-danger text-page" },
+  abandoned: { label: "Abandoned", className: "bg-ink/15 text-ink-dim" },
 };
 
 /** The states a run is no longer moving out of. */
@@ -32,8 +32,11 @@ const SETTLED: RunState[] = ["completed", "failed", "abandoned"];
  * it found. This component starts one, polls, and renders what comes back; it never infers an
  * outcome from elapsed time, because a slow sweep and a dead one look identical from here and only
  * the server knows which it is.
+ *
+ * ``onSwept`` fires when a watched pass reaches a final state, because the postings the board tab
+ * is holding were read before it ran and are now behind.
  */
-export function SweepPanel() {
+export function SweepPanel({ onSwept }: { onSwept: () => void }) {
   const [sweep, setSweep] = useState<SweepState>({ kind: "idle" });
   const [history, setHistory] = useState<HistoryState>({ kind: "idle" });
 
@@ -97,11 +100,13 @@ export function SweepPanel() {
         setSweep({ kind: "idle" });
         return;
       }
-      if (SETTLED.includes(run.state)) setSweep({ kind: "finished", run });
+      if (!SETTLED.includes(run.state)) return;
+      setSweep({ kind: "finished", run });
+      onSwept();
     }, POLL_INTERVAL);
 
     return () => clearInterval(timer);
-  }, [sweep, loadHistory]);
+  }, [sweep, loadHistory, onSwept]);
 
   /**
    * Asks the API to start a sweep.
@@ -109,6 +114,11 @@ export function SweepPanel() {
    * A 409 becomes `refused` rather than an error: it means a sweep is already going, which is what
    * the user wanted to be true. The history is reloaded so the pass already under way is picked up
    * and watched, which is what turns the refusal into something the panel can follow.
+   *
+   * When that reload finds nothing running the panel returns to `idle`, because the blocking sweep
+   * can finish in the moment between the refusal and the reload. Staying on `refused` would leave
+   * "a sweep is already running" on screen beside a button that works, contradicting itself until
+   * something else happened to move the panel.
    */
   async function run() {
     setSweep({ kind: "starting" });
@@ -121,7 +131,7 @@ export function SweepPanel() {
         setSweep({ kind: "refused", message: error.message });
         const runs = await loadHistory();
         const live = runs?.find((candidate) => candidate.state === "running");
-        if (live) setSweep({ kind: "running", runId: live.id });
+        setSweep(live ? { kind: "running", runId: live.id } : { kind: "idle" });
         return;
       }
       setSweep({
@@ -147,7 +157,7 @@ export function SweepPanel() {
             type="button"
             onClick={() => void run()}
             disabled={busy}
-            className="rounded-md bg-accent px-4 py-2 font-medium text-page transition hover:bg-accent-bright disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-md bg-accent px-4 py-2 font-medium text-ink transition hover:bg-accent-bright disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy ? "Sweeping…" : "Run a sweep"}
           </button>
@@ -192,7 +202,9 @@ function SweepStatus({ state }: { state: SweepState }) {
 
   const { run } = state;
   if (run.state === "completed" && run.summary) {
-    return <Note tone="dim">Finished {relativeTime(run.started_at)}.</Note>;
+    return (
+      <Note tone="dim">Finished {relativeTime(run.finished_at ?? run.started_at)}.</Note>
+    );
   }
   return (
     <Note tone="danger">
@@ -213,7 +225,7 @@ function Note({
 }) {
   const colour =
     tone === "danger"
-      ? "text-danger"
+      ? "text-danger-ink"
       : tone === "accent"
         ? "text-accent-ink"
         : "text-ink-dim";
@@ -226,7 +238,7 @@ function HistoryList({ state }: { state: HistoryState }) {
     return <p className="mt-3 text-sm text-ink-dim">Loading…</p>;
   }
   if (state.kind === "error") {
-    return <p className="mt-3 text-sm text-danger">Could not load the history — {state.message}</p>;
+    return <p className="mt-3 text-sm text-danger-ink">Could not load the history — {state.message}</p>;
   }
   if (state.runs.length === 0) {
     return (
@@ -273,12 +285,12 @@ function HistoryRow({ run }: { run: SweepRun }) {
           <Count label="closed" value={run.summary.closed} />
           <Count label="reopened" value={run.summary.reopened} />
           {run.summary.boards_failed > 0 && (
-            <span className="text-danger">{run.summary.boards_failed} boards failed</span>
+            <span className="text-danger-ink">{run.summary.boards_failed} boards failed</span>
           )}
         </div>
       )}
 
-      {run.error && <p className="mt-2 text-sm text-danger">{run.error}</p>}
+      {run.error && <p className="mt-2 text-sm text-danger-ink">{run.error}</p>}
 
       {run.summary && run.summary.failures.length > 0 && <Failures failures={run.summary.failures} />}
     </li>

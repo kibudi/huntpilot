@@ -105,11 +105,20 @@ async def list_postings(status: PostingStatus | None = None) -> list[PostingRead
 
     Returns:
         The matching postings, newest discovery first.
+
+    Raises:
+        HTTPException: 422 with the reason, if the stored profile no longer validates. Reading a
+            profile is not this endpoint's purpose, but it needs one to classify a region, and the
+            same reasoning as ``read_profile`` applies: a 500 would put "which entry is empty" in a
+            server log and leave the board tab with a failure nobody can act on.
     """
     query = Posting.find_all() if status is None else Posting.find(Posting.status == status)
     postings = await query.sort("-first_seen_at").to_list()
     companies = await Company.find_all().to_list()
-    profile = await active_profile()
+    try:
+        profile = await active_profile()
+    except ProfileError as error:
+        raise HTTPException(HTTPStatus.UNPROCESSABLE_ENTITY, str(error)) from error
     names = {(company.ats, company.token): company.name for company in companies}
     return [
         PostingRead(
