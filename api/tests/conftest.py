@@ -18,6 +18,7 @@ from pymongo import AsyncMongoClient
 
 from app.db import DOCUMENT_MODELS, init_db
 from app.main import app
+from app.profile import Profile
 
 TEST_DB = "huntpilot_test"
 
@@ -37,6 +38,48 @@ fields a client must supply are the same ones the document has no default for.
 
 Tests that care about one field override it at the call site rather than editing this.
 """
+
+
+@pytest.fixture
+def berlin_profile() -> Profile:
+    """A search with nothing in common with the committed profile: Go, in Berlin, five years in.
+
+    Every value is deliberately the opposite of the default's. It looks at German cities instead
+    of Israeli ones; its families are named for a stack this repository's owner does not work in,
+    including one — "distributed systems" — that the fixed set of families used to make
+    unsayable; Python and React are on its *unknown* side; it tolerates "Senior" in a title,
+    because five years in that is what the person searching is; and it accepts a weaker match at
+    0.6. A posting the committed profile keeps is one this profile must throw away, and the
+    reverse.
+
+    Lives here rather than in one test file because the relevance and the stack tests both need
+    it to make the same point, and two copies would drift into proving two different things.
+    """
+    return Profile.model_validate(
+        {
+            "local_fragments": ["Berlin", "germany", "münchen", "munich", "hamburg"],
+            "remote_fragments": ["remote", "anywhere"],
+            "seniority_markers": r"\b(principal|staff|head of|director|vp|chief)\b",
+            "role_families": {
+                "backend": r"\b(back[ -]?end|go(lang)? (developer|engineer))\b",
+                "distributed systems": r"\bdistributed systems\b",
+            },
+            "known": {
+                "go": r"\bgolang\b|\bgo\b(?= developer| engineer| programming)",
+                "grpc": r"\bgrpc\b",
+                "kubernetes": r"kubernetes|\bk8s\b",
+                "postgresql": r"postgres(ql)?",
+            },
+            "unknown": {
+                "python": r"\bpython\b",
+                "fastapi": r"fastapi",
+                "react": r"\breact\b",
+                "java": r"\bjava\b",
+            },
+            "min_tech_score": 0.6,
+            "max_years": 5,
+        }
+    )
 
 
 @pytest.fixture

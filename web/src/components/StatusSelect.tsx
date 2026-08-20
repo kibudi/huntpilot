@@ -26,8 +26,8 @@ export function StatusSelect({
       aria-label="Status"
       className="cursor-pointer appearance-none rounded-full py-1 pr-2 pl-2.5 text-xs font-semibold capitalize outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
       style={{
-        background: `oklch(26% ${c} ${h})`,
-        color: `oklch(78% ${Math.max(c, 0.01)} ${h})`,
+        background: `oklch(91% ${c * 0.6} ${h})`,
+        color: `oklch(38% ${Math.max(c, 0.01)} ${h})`,
       }}
     >
       {STATUSES.map((status) => (

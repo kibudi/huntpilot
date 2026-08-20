@@ -1,0 +1,28 @@
+# Describes the style already in the tree, so an editor that reads this file does not fight it.
+# LF everywhere: the repository stores LF, and on Windows git converts on checkout — this keeps
+# what an editor writes matching what git stores.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.py]
+indent_size = 4
+# Matches ruff's line-length in api/pyproject.toml; anything longer fails the lint.
+max_line_length = 100
+
+[*.toml]
+indent_size = 4
+
+[{Dockerfile,*.conf}]
+indent_size = 4
+
+# Nothing in this repository relies on trailing double-space line breaks, so markdown keeps the
+# global trim rather than an exception for it.
+[*.md]
+indent_size = 2

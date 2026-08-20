@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/kibudi/huntpilot/actions/workflows/ci.yml/badge.svg)](https://github.com/kibudi/huntpilot/actions/workflows/ci.yml)
 
-A job-application tracker, and a tracker for the job boards themselves. One backend, a web
-dashboard, a scheduled sweep, and — eventually — a Discord bot, so tracking an application takes a
-slash command rather than opening a spreadsheet you stop updating after two weeks.
+A job-application tracker, and a tracker for the job boards themselves: one backend, a web
+dashboard and a scheduled sweep, so a job hunt lives somewhere better than a spreadsheet you stop
+updating after two weeks.
 
 The part worth reading about is the board tracker: it watches company job boards over time and
 reports what **changed**, which is the one thing no job board will tell you.
@@ -19,14 +19,14 @@ containerisation.
 
 | | |
 |---|---|
-| API | FastAPI + Beanie ODM on MongoDB Atlas, 6 endpoints, 126 tests |
+| API | FastAPI + Beanie ODM on MongoDB Atlas, 6 endpoints, 138 tests |
 | Dashboard | React 19 + TypeScript + Tailwind v4, two tabs, inline status editing |
 | Board tracker | Sweeps Greenhouse, Lever and Ashby boards; stores what changed, not what is listed |
 | Worker | Celery + Beat on Redis, one sweep every six hours |
 | CI | GitHub Actions: ruff, mypy and pytest against a MongoDB service, plus the frontend build |
 | Containers | `docker compose up` runs all of it |
 
-**Not built:** Discord bot, the digest, Kubernetes, Terraform.
+**Not built:** the digest, Kubernetes, Terraform.
 
 ## The board tracker
 
@@ -53,6 +53,18 @@ reconciles the result against what it stored last time.
 | reconcile | still listed, newly appeared, or absent — **this gate is the product** |
 
 One real sweep of 28 boards: **1,026 postings in, 7 out.**
+
+### Make it yours
+
+Every filter is a profile, not a hard-coded preference. `api/app/profile.json` holds the locations
+worth commuting to, the role families worth seeing, the technologies you already know, the ones you
+do not, the seniority words that rule a title out, and the two thresholds. Point
+`PROFILE_PATH` at your own file and the same sweep answers a different question — a bad profile
+fails at startup with the reason, rather than silently filtering everything away.
+
+One real board, two profiles: Cato Networks lists 121 roles. A junior Python profile keeps none of
+them today; a senior data profile keeps three — Agentic AI Engineer, Data Scientist, Field AI
+Engineer.
 
 Run one by hand:
 
@@ -97,7 +109,7 @@ Vite proxies `/api` to port 8000, so the browser sees one origin either way.
 
 ```sh
 cd api
-uv run pytest                 # 126 tests; most need a live MongoDB
+uv run pytest                 # 138 tests; most need a live MongoDB
 uv run mypy app tests         # strict
 uv run ruff check app tests
 uv run python -m app.sweep    # one sweep now, printed as JSON
@@ -114,12 +126,11 @@ because Beanie cannot construct a `Document` before `init_beanie` has reached a 
 ## Architecture
 
 ```
-          ┌──────────────┐        ┌──────────────┐
-          │ web (React)  │        │ bot (Discord)│  not built
-          └──────┬───────┘        └──────┬───────┘
-                 │ HTTP                  │ HTTP
-                 └───────────┬───────────┘
-                             ▼
+                     ┌──────────────┐
+                     │ web (React)  │
+                     └──────┬───────┘
+                            │ HTTP
+                            ▼
                      ┌───────────────┐
                      │ api (FastAPI) │
                      └───────┬───────┘
@@ -139,7 +150,7 @@ because Beanie cannot construct a `Document` before `init_beanie` has reached a 
 
 The worker reaches MongoDB directly rather than through the API, because it is the same codebase
 run with a different command — the sweep imports `boards.py` and `relevance.py` and would gain
-nothing from a round trip through HTTP. The dashboard and the bot go through the API.
+nothing from a round trip through HTTP. The dashboard goes through the API.
 
 `api/` and the worker built from it are the only things that touch the database. In the container image, nginx serves the
 built dashboard and proxies `/api` to the API service, which is why the client can call bare
@@ -150,6 +161,8 @@ api/app/     config.py  db.py  models.py  schemas.py  main.py
              boards.py     — fetching, normalising and reconciling company boards
              relevance.py  — which postings are worth storing at all
              stack.py      — scoring a description against a known stack
+             profile.py    — the search itself: locations, roles, stack, thresholds
+             profile.json  — the committed profile, and the worked example
              sweep.py      — one pass over the watchlist; also `python -m app.sweep`
              worker.py     — the Celery app and the six-hourly schedule
 api/tests/   conftest.py and one file per area
@@ -233,3 +246,13 @@ The plan deck in `docs/plan.html` describes the intent, including the DevOps lay
 Some slides describe the plan rather than what is built; the Status table above is authoritative.
 `docs/board-tracker.md` is the design note for the tracker, including the research that decided
 what was feasible and what was not.
+
+## Contributing
+
+`CONTRIBUTING.md` has the setup, the checks CI runs, and the two conventions this project is strict
+about: docstrings instead of inline comments, and a test proven to fail when the bug it guards comes
+back. `SECURITY.md` covers the one credential involved.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
