@@ -185,9 +185,10 @@ class ProfileBody(BaseModel):
     the constraints would give two answers to that question, and the copy is the one that would
     fall behind.
 
-    Patterns are strings, exactly as ``profile.json`` writes them, because that is what a person
-    edits and what JSON can carry. They are compiled on the way in, and a broken one comes back as
-    a rejection naming the technology or family it belongs to.
+    Vocabularies are lists of plain words, exactly as ``profile.json`` writes them, because that is
+    what a person edits and what JSON can carry. The boundaries that stop a short word matching
+    inside a longer one are added when ``Profile`` compiles the list, so nothing here — and nothing
+    in a client — has to know what a word boundary is.
 
     Field order matches ``Profile``: ``role_families`` is tried in the order given, so the order a
     client sends is a decision it is making.
@@ -197,10 +198,10 @@ class ProfileBody(BaseModel):
 
     local_fragments: list[str]
     remote_fragments: list[str]
-    seniority_markers: str
-    role_families: dict[str, str]
-    known: dict[str, str]
-    unknown: dict[str, str] = Field(default_factory=dict)
+    seniority_markers: list[str]
+    role_families: dict[str, list[str]]
+    known: dict[str, list[str]]
+    unknown: dict[str, list[str]] = Field(default_factory=dict)
     min_tech_score: float
     max_years: int
 

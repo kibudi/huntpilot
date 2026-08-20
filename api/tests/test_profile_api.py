@@ -4,9 +4,10 @@
 the profile lives in the database: that an empty database still has one, that an edit sticks, and
 that the rules the file has always been held to are the rules an edit is held to as well.
 
-The refusals are the point. Every one of them — a score written as a percentage, a pattern with an
-unclosed bracket, an emptied whitelist — produces a sweep that stores nothing and reports no error,
-so an edit that makes one of them has to come back as a rejection naming the thing that is wrong.
+The refusals are the point. Every one of them — a score written as a percentage, an emptied
+vocabulary, an emptied whitelist — produces a sweep that stores nothing, or stores everything, and
+reports no error either way, so an edit that makes one has to come back as a rejection naming the
+thing that is wrong.
 Saved and silently filtering everything away is the failure this endpoint exists to prevent.
 """
 
@@ -110,20 +111,19 @@ async def test_a_score_written_as_a_percentage_is_refused(api: AsyncClient) -> N
     assert (await api.get("/api/profile")).json()["min_tech_score"] == 0.8
 
 
-async def test_a_broken_pattern_is_refused_naming_the_entry(api: AsyncClient) -> None:
-    """An unclosed bracket is a plausible typo, and a profile holds sixty patterns to find it in.
+async def test_an_emptied_vocabulary_is_refused_naming_the_entry(api: AsyncClient) -> None:
+    """An entry left with no words is the one typo a word list can still carry.
 
-    Compiled as the profile is validated rather than at first use, so it is caught here instead of
-    raising in the middle of a sweep, inside the one ``except`` that reads any exception as a board
-    that could not be read — where one typo would be reported as several dozen companies being down.
+    It matters more than it looks: an empty alternation compiles to a pattern that matches the
+    empty string, so the technology would count as named in every posting ever written and the
+    score it feeds would be inverted rather than merely wrong. The reply has to name the entry,
+    since a profile holds sixty of them.
     """
-    response = await api.put(
-        "/api/profile", json=_body(known=COMMITTED["known"] | {"sql": "[unclosed"})
-    )
+    response = await api.put("/api/profile", json=_body(known=COMMITTED["known"] | {"sql": []}))
 
     assert response.status_code == 422
     assert "sql" in response.text
-    assert "valid regular expression" in response.text
+    assert (await api.get("/api/profile")).json()["known"]["sql"] == ["sql"]
 
 
 async def test_a_whitelist_emptied_by_an_edit_is_refused(api: AsyncClient) -> None:

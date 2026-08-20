@@ -13,13 +13,17 @@ rather than a formality: a profile is the one input that can fail *quietly*: a m
 pattern that matches nothing produces a sweep that stores no postings, which looks exactly like a
 quiet week on the boards. Every constraint here exists to turn one of those into a startup error.
 
-The vocabularies stay regular expressions rather than becoming word lists. Postings write one
-technology many ways — "Node.js", "NodeJS", "Node", "K8s" — and some words have to be pinned to
-the places they name a technology at all, which is why "Go" is only counted before "developer",
-"engineer" or "programming". A profile of plain words would score worse than the constants it
-replaced. The cost is that a profile can carry a broken pattern, so every pattern is compiled as
-the file loads: a typo is a startup failure naming the file, not an exception in the middle of a
-sweep six hours later.
+The vocabularies are word lists, not regular expressions. Postings write one technology many ways
+— "Node.js", "NodeJS", "Node", "K8s" — so an entry is a list of the spellings rather than one
+spelling, and the boundaries that stop a short word matching inside a longer one are added when
+the list is compiled instead of being written by hand. This is what lets the dashboard edit a
+profile: asking the person searching to write a regular expression, and to get it right, is asking
+the wrong thing of them.
+
+They were patterns until the editor existed, and the conversion cost precision in exactly two
+places — the entries that pinned a word to the context naming a technology at all, like "Go" only
+before "developer" or "engineer". Those are written out as the phrases instead, which is narrower
+than the lookahead was and readable by the person maintaining it.
 
 The file is the *default*, not the running search. Once the dashboard can edit the profile, a file
 read at startup cannot be the source of truth: an edit would take effect at the next restart, and
@@ -33,6 +37,7 @@ quietly keeping nothing.
 import json
 import re
 from datetime import UTC, datetime
+from functools import cached_property
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -105,6 +110,100 @@ def _source(pattern: re.Pattern[str]) -> str:
 Pattern = Annotated[re.Pattern[str], BeforeValidator(_compile), PlainSerializer(_source)]
 """A regular expression as a profile states it: a string in the file, compiled in the model."""
 
+Term = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, to_lower=True)]
+"""One word or phrase a profile recognises something by.
+
+Lower-cased because every match this project makes is case-insensitive anyway, so two
+capitalisations of one word are the same term and should not be storable as two.
+"""
+
+
+def _bounded(term: str) -> str:
+    r"""Wraps one term in the boundaries that keep it from matching inside a longer word.
+
+    ``\`` is not used, because it is defined against the character beside it and half the terms
+    here start or end with punctuation. ``\c++\`` never matches, since there is no word boundary
+    after ``+``; ``\.net\`` fails to match "ASP.NET", because the boundary before ``.`` requires
+    the preceding character to be a word character and ``P`` is one.
+
+    So a boundary is asserted only on the sides where the term itself ends in a word character.
+    "python" gets both and cannot match inside "pythonic"; ".net" gets only the trailing one and
+    still matches "ASP.NET"; "c++" gets only the leading one and still matches "C++17".
+
+    A trailing "s" is allowed through that boundary, because postings pluralise the things they
+    name and a term list is written in the singular a person would type. Without it "large language
+    model" misses "Large Language Models" and "snowflake" misses "snowflakes" — both found by
+    running the old patterns and the new terms over four hundred live postings and looking at every
+    case where they disagreed. It also earns "LLMs", which the pattern this replaced did not match
+    either.
+
+    Args:
+        term: The term, already stripped and lower-cased.
+
+    Returns:
+        The escaped term with the boundaries that apply to it.
+    """
+    lead = r"(?<!\w)" if term[0].isalnum() or term[0] == "_" else ""
+    trail = r"s?(?!\w)" if term[-1].isalnum() or term[-1] == "_" else ""
+    return f"{lead}{re.escape(term)}{trail}"
+
+
+class Terms(BaseModel):
+    """The words that recognise one technology, one family of role, or one seniority marker.
+
+    A list of plain words rather than a regular expression, because a profile is edited by the
+    person searching and a regular expression is not something they should have to write. Every
+    entry in the default profile that used to be a pattern is an alternation of words with word
+    boundaries around it — which is exactly what this builds, from a list anyone can extend.
+
+    The cost is precision at the edges. A pattern could say "go, but only when followed by
+    developer or engineer"; a term list says "golang", "go developer", "go engineer" instead, which
+    is narrower but readable. That trade was taken deliberately: the entries needing a lookahead
+    were two, and neither is worth a syntax in the editor.
+
+    Matching lives here rather than at the call sites so that ``relevance`` and ``stack`` ask the
+    same question of a family, a known technology and a seniority marker, and none of them knows
+    whether a profile stated one word or twenty.
+    """
+
+    terms: list[Term] = Field(min_length=1)
+    """The words, in the order written. At least one, since none matches nothing."""
+
+    @cached_property
+    def pattern(self) -> re.Pattern[str]:
+        """The terms as one case-insensitive alternation.
+
+        Compiled once per set rather than per posting: a sweep asks the same sixty vocabularies
+        about every description on every board, and recompiling for each would be the work of the
+        pass rather than an incidental cost.
+        """
+        return re.compile("|".join(_bounded(term) for term in self.terms), re.IGNORECASE)
+
+    def search(self, text: str) -> re.Match[str] | None:
+        """Returns the first term found in the text, or None if none is.
+
+        Named to match ``re.Pattern`` so that the code doing the filtering reads the same as it did
+        when a profile held patterns directly.
+        """
+        return self.pattern.search(text)
+
+
+def _as_terms(value: Any) -> Any:
+    """Accepts a bare list of words where a term set is expected.
+
+    A profile writes ``["golang", "go developer"]``, not ``{"terms": [...]}``: the wrapper is an
+    implementation detail of matching, and making a person type it in every one of sixty entries
+    would be noise. A mapping is passed through untouched so a ``Terms`` can still be built the
+    ordinary way.
+    """
+    return {"terms": value} if isinstance(value, list) else value
+
+
+Vocabulary = Annotated[
+    Terms, BeforeValidator(_as_terms), PlainSerializer(lambda terms: terms.terms)
+]
+"""A set of words as a profile states it: a list of strings in the file, a matcher in the model."""
+
 FamilyName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, to_lower=True)]
 """What a profile calls one family of role.
 
@@ -171,11 +270,12 @@ class Profile(BaseModel):
     Settling that needs the description read by a person, so it is kept rather than dropped now.
     """
 
-    seniority_markers: Pattern
+    seniority_markers: Vocabulary
     """Title words stating outright that a role is beyond the experience level being searched for.
 
-    One pattern rather than a word list because the alternations carry real work: optional full
-    stops in "Sr.", word boundaries so short markers do not match inside longer words.
+    A word list, with both spellings of an abbreviation written out — "sr" and "sr." are two
+    terms rather than one pattern with an optional full stop, which is the shape a person editing
+    this can extend without knowing what an optional full stop looks like in a regular expression.
 
     Leadership words belong here rather than among the families: a team lead, an engineering
     manager and a principal engineer are roles the posting itself puts out of reach, whatever
@@ -184,7 +284,7 @@ class Profile(BaseModel):
     letter that matches far more than it would buy.
     """
 
-    role_families: dict[FamilyName, Pattern] = Field(min_length=1)
+    role_families: dict[FamilyName, Vocabulary] = Field(min_length=1)
     """The kinds of role worth surfacing, and how each is recognised in a title.
 
     A whitelist rather than a subtraction. Naming the families that fit is both narrower and more
@@ -201,14 +301,14 @@ class Profile(BaseModel):
     that stores nothing is indistinguishable from a quiet week on the boards.
     """
 
-    known: dict[TechName, Pattern] = Field(min_length=1)
+    known: dict[TechName, Vocabulary] = Field(min_length=1)
     """Technologies there is real experience behind, and how each is written about.
 
     At least one is required, for the same reason as ``role_families``: with none, every posting
     scores zero and the whole sweep is filtered away without a word.
     """
 
-    unknown: dict[TechName, Pattern] = Field(default_factory=dict)
+    unknown: dict[TechName, Vocabulary] = Field(default_factory=dict)
     """Technologies a posting may demand that the profile's owner does not have.
 
     These exist so that a score means something. A match is scored as the share of the

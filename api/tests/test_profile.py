@@ -1,7 +1,7 @@
 """Tests for loading and validating a profile.
 
 The subject here is failure. A profile is the one input that can go wrong quietly: a mistyped
-field name, a pattern with an unclosed bracket or a score written as 80 instead of 0.8 all produce
+field name, an emptied vocabulary or a score written as 80 instead of 0.8 all produce
 a sweep that stores nothing, which is indistinguishable from a quiet week on the boards. Each test
 below is one of those mistakes, and each asserts that it stops the load with the file named rather
 than being absorbed.
@@ -14,15 +14,15 @@ from typing import Any
 import pytest
 
 from app.config import DEFAULT_PROFILE_FILE, settings
-from app.profile import Profile, ProfileError, load_profile
+from app.profile import Profile, ProfileError, Terms, load_profile
 
 VALID: dict[str, Any] = {
     "local_fragments": ["berlin"],
     "remote_fragments": ["remote"],
-    "seniority_markers": r"\b(principal|staff)\b",
-    "role_families": {"backend": r"\bback[ -]?end\b"},
-    "known": {"go": r"\bgolang\b"},
-    "unknown": {"java": r"\bjava\b"},
+    "seniority_markers": ["principal", "staff"],
+    "role_families": {"backend": ["back end", "back-end", "backend"]},
+    "known": {"go": ["golang"]},
+    "unknown": {"java": ["java"]},
     "min_tech_score": 0.6,
     "max_years": 5,
 }
@@ -69,21 +69,35 @@ def test_the_committed_profile_is_the_one_loaded_by_default() -> None:
     assert "java" in shipped.unknown
 
 
-def test_a_broken_pattern_fails_the_load(tmp_path: Path) -> None:
-    """The reason patterns are compiled at load rather than at first use.
+def test_an_empty_vocabulary_fails_the_load(tmp_path: Path) -> None:
+    """An entry naming no words is the typo a word list can still carry.
 
-    An unclosed bracket is a plausible typo in a file edited by hand. Compiled lazily it would
-    raise in the middle of a sweep, inside the one ``except`` that treats an exception as a board
-    that could not be read — so a typo in the profile would be reported as several dozen companies
-    being down. The error has to name the entry, since a profile holds sixty of them.
+    Patterns could be malformed; a list cannot, so the way an entry goes wrong now is by being
+    empty. It has to be refused at load rather than absorbed, because an empty alternation compiles
+    to a pattern matching the empty string — which would count that technology as present in every
+    posting ever written, silently inverting the score it feeds. The error has to name the entry,
+    since a profile holds sixty of them.
     """
-    path = _write(tmp_path, VALID | {"known": {"go": r"\bgolang\b", "sql": "[unclosed"}})
+    path = _write(tmp_path, VALID | {"known": {"go": ["golang"], "sql": []}})
 
     with pytest.raises(ProfileError) as caught:
         load_profile(path)
 
     assert "sql" in str(caught.value)
-    assert "valid regular expression" in str(caught.value)
+
+
+def test_a_blank_term_fails_the_load(tmp_path: Path) -> None:
+    """A term of whitespace is the other way an entry comes to match everything.
+
+    Distinct from the empty list: the entry has a term, so a length check on the list passes, while
+    the term itself contributes an empty alternative to the pattern and matches at every position.
+    """
+    path = _write(tmp_path, VALID | {"known": {"go": ["golang", "   "]}})
+
+    with pytest.raises(ProfileError) as caught:
+        load_profile(path)
+
+    assert "go" in str(caught.value)
 
 
 def test_a_misspelt_field_is_refused(tmp_path: Path) -> None:
@@ -171,3 +185,43 @@ def test_a_profile_cannot_be_changed_after_loading() -> None:
 
     with pytest.raises(ValueError):
         loaded.max_years = 9
+
+
+@pytest.mark.parametrize(
+    ("term", "text", "expected"),
+    [
+        ("python", "Python 3 experience", True),
+        ("python", "a pythonic codebase", False),
+        ("go", "please go to our careers page", True),
+        ("go developer", "please go to our careers page", False),
+        ("go developer", "hiring a Go Developer", True),
+        (".net", "ASP.NET Core", True),
+        ("c++", "C++17 and beyond", True),
+        ("c#", "C# and F#", True),
+        ("large language model", "Large Language Models (LLMs)", True),
+        ("llm", "reads about LLMs daily", True),
+        ("rails", "the guardrails against nonsense", False),
+        ("sql", "SQL and NoSQL", True),
+    ],
+)
+def test_a_term_matches_the_word_and_not_the_word_inside_another(
+    term: str, text: str, expected: bool
+) -> None:
+    """The boundary rule the whole conversion from patterns rests on.
+
+    Four behaviours are asserted together because they are one rule with one exception each way.
+    A term ending in a letter may not match inside a longer word, or "python" would be found in
+    "pythonic" and every posting would score as knowing it. A term whose own edge is punctuation
+    gets no boundary on that side, or ".net" would miss "ASP.NET" — the boundary before the dot
+    asks the preceding character not to be a word character, and in "ASP.NET" it is. A trailing
+    "s" is allowed through, because postings pluralise and the list is written singular. And a
+    multi-word term still matches as a phrase, which is how the entries that used to need a
+    lookahead are written now.
+
+    ``go`` is here twice on purpose: alone it is the English word and matches prose, which is the
+    precision the old pattern bought with a lookahead and the reason the profile now says
+    "go developer" instead.
+    """
+    terms = Terms(terms=[term])
+
+    assert bool(terms.search(text)) is expected

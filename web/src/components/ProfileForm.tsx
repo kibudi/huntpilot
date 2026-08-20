@@ -78,14 +78,14 @@ export function ProfileForm() {
       </div>
 
       <Panel title="Where" hint="Matched against the posting's location, lower-cased.">
-        <ListField
+        <ChipField
           label="Local spellings"
           hint="Cities and districts worth commuting to, however the boards write them."
           value={draft.local_fragments}
           onChange={(local_fragments) => edit({ local_fragments })}
           error={errorFor(errors, "local_fragments")}
         />
-        <ListField
+        <ChipField
           label="Remote wordings"
           hint="What a board says when a role is advertised as remote."
           value={draft.remote_fragments}
@@ -94,18 +94,18 @@ export function ProfileForm() {
         />
       </Panel>
 
-      <Panel title="Which roles" hint="Patterns are regular expressions, compiled by the API.">
-        <MapField
+      <Panel title="Which roles" hint="Matched against the posting's title.">
+        <VocabularyField
           label="Role families"
-          hint="Tried in the order listed. A posting matching none of them is dropped."
+          hint="Tried in the order listed. A posting whose title matches none of them is dropped."
           keyLabel="family"
           value={draft.role_families}
           onChange={(role_families) => edit({ role_families })}
           error={errorFor(errors, "role_families")}
         />
-        <TextField
+        <ChipField
           label="Seniority markers"
-          hint="One pattern. A title matching it is too senior and is dropped."
+          hint="A title containing any of these is too senior and is dropped."
           value={draft.seniority_markers}
           onChange={(seniority_markers) => edit({ seniority_markers })}
           error={errorFor(errors, "seniority_markers")}
@@ -113,7 +113,7 @@ export function ProfileForm() {
       </Panel>
 
       <Panel title="Which stack" hint="Read from the posting's description, not its title.">
-        <MapField
+        <VocabularyField
           label="Known"
           hint="Technologies already worked in. These count for a posting."
           keyLabel="technology"
@@ -121,7 +121,7 @@ export function ProfileForm() {
           onChange={(known) => edit({ known })}
           error={errorFor(errors, "known")}
         />
-        <MapField
+        <VocabularyField
           label="Unknown"
           hint="Technologies not worked in. These count against a posting."
           keyLabel="technology"
@@ -207,7 +207,7 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-sm font-medium text-ink">{label}</span>
+      {label && <span className="text-sm font-medium text-ink">{label}</span>}
       {hint && <span className="text-xs text-ink-dim">{hint}</span>}
       {children}
       {error && <span className="text-xs text-danger">{error}</span>}
@@ -222,8 +222,17 @@ function inputClass(error?: string): string {
   }`;
 }
 
-/** One line of text. */
-function TextField({
+/**
+ * A list of words, shown as removable chips with one box to add more.
+ *
+ * Chips rather than a text area, because the words are the thing being edited and a comma or a
+ * stray newline should not be able to change what they are. Typing a word and pressing Enter adds
+ * it; the × removes it. Nothing here interprets a word — a chip is a string on its way to the API.
+ *
+ * Comma and Tab add a term as well as Enter, because a list of words is what people paste, and
+ * pasting "react, redux, vue" into a box that only understands Enter produces one absurd term.
+ */
+function ChipField({
   label,
   hint,
   value,
@@ -232,23 +241,169 @@ function TextField({
 }: {
   label: string;
   hint?: string;
-  value: string;
-  onChange: (value: string) => void;
+  value: string[];
+  onChange: (value: string[]) => void;
   error?: string;
 }) {
+  const [entry, setEntry] = useState("");
+
+  /** Adds whatever is typed, ignoring blanks and anything already listed. */
+  function commit(raw: string) {
+    let next = value;
+    for (const piece of raw.split(",")) {
+      const word = piece.trim().toLowerCase();
+      if (word.length > 0 && !next.includes(word)) next = [...next, word];
+    }
+    onChange(next);
+    setEntry("");
+  }
+
   return (
     <Field label={label} hint={hint} error={error}>
-      <input
-        type="text"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={inputClass(error)}
-      />
+      <div
+        className={`flex flex-wrap items-center gap-1.5 rounded-md border bg-raised p-2 ${
+          error ? "border-danger" : "border-line"
+        }`}
+      >
+        {value.map((word) => (
+          <span
+            key={word}
+            className="inline-flex items-center gap-1 rounded-full bg-accent/15 px-2 py-0.5 text-xs text-accent-ink"
+          >
+            {word}
+            <button
+              type="button"
+              onClick={() => onChange(value.filter((other) => other !== word))}
+              aria-label={`Remove ${word}`}
+              className="cursor-pointer text-accent-ink/70 hover:text-danger"
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        <input
+          type="text"
+          value={entry}
+          placeholder={value.length === 0 ? "type a word, press Enter" : "add…"}
+          onChange={(event) => setEntry(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === "," || event.key === "Tab") {
+              if (entry.trim().length === 0) return;
+              event.preventDefault();
+              commit(entry);
+            } else if (event.key === "Backspace" && entry.length === 0 && value.length > 0) {
+              onChange(value.slice(0, -1));
+            }
+          }}
+          onBlur={() => entry.trim().length > 0 && commit(entry)}
+          className="min-w-32 flex-1 bg-transparent px-1 py-0.5 text-sm text-ink focus:outline-none"
+        />
+      </div>
     </Field>
   );
 }
 
-/** A number, kept a number rather than a string so the API is not sent `"0.8"`. */
+/**
+ * A set of named vocabularies, each a chip list of its own.
+ *
+ * The name is what a match is reported under — "ci/cd", "c++" — and the words are how a posting
+ * might write it. Both are editable, and a row can be removed outright, because which technologies
+ * are worth scoring at all is as personal as how they are spelled.
+ *
+ * Renaming rebuilds the map rather than mutating a key, so the order entries were written in
+ * survives an edit. For role families that order is not cosmetic: it is the tie-break when a title
+ * answers to more than one family.
+ */
+function VocabularyField({
+  label,
+  hint,
+  keyLabel,
+  value,
+  onChange,
+  error,
+}: {
+  label: string;
+  hint?: string;
+  keyLabel: string;
+  value: Record<string, string[]>;
+  onChange: (value: Record<string, string[]>) => void;
+  error?: string;
+}) {
+  const [fresh, setFresh] = useState("");
+  const entries = Object.entries(value);
+
+  /** Rewrites the map, preserving order, with one entry renamed, replaced or dropped. */
+  function replace(at: string, name: string | null, words?: string[]) {
+    const next: Record<string, string[]> = {};
+    for (const [key, terms] of entries) {
+      if (key !== at) {
+        next[key] = terms;
+        continue;
+      }
+      if (name === null) continue;
+      next[name] = words ?? terms;
+    }
+    onChange(next);
+  }
+
+  return (
+    <Field label={label} hint={hint} error={error}>
+      <div className="flex flex-col gap-2">
+        {entries.map(([name, words]) => (
+          <div key={name} className="flex flex-col gap-1 rounded-md border border-line bg-raised p-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={name}
+                aria-label={`${keyLabel} name`}
+                onChange={(event) => replace(name, event.target.value)}
+                className="w-44 rounded border border-line bg-panel px-2 py-1 text-sm font-medium text-ink focus:outline-none focus:ring-2 focus:ring-accent"
+              />
+              <button
+                type="button"
+                onClick={() => replace(name, null)}
+                aria-label={`Remove ${name}`}
+                className="cursor-pointer text-xs text-ink-dim hover:text-danger"
+              >
+                remove
+              </button>
+            </div>
+            <ChipField
+              label=""
+              value={words}
+              onChange={(next) => replace(name, name, next)}
+            />
+          </div>
+        ))}
+
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={fresh}
+            placeholder={`add a ${keyLabel}…`}
+            onChange={(event) => setFresh(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return;
+              event.preventDefault();
+              const name = fresh.trim().toLowerCase();
+              if (name.length === 0 || name in value) return;
+              onChange({ ...value, [name]: [name] });
+              setFresh("");
+            }}
+            className="w-52 rounded-md border border-line bg-raised px-2 py-1 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-accent"
+          />
+        </div>
+      </div>
+    </Field>
+  );
+}
+
+/**
+ * A number, kept a number rather than a string so the API is not sent `"0.8"`.
+ *
+ * `valueAsNumber` rather than parsing the text: an emptied box gives `NaN`, which the API rejects
+ * by name, where parsing would quietly send a zero and change the search without saying so.
+ */
 function NumberField({
   label,
   hint,
@@ -275,100 +430,6 @@ function NumberField({
       />
     </Field>
   );
-}
-
-/**
- * A list of short strings, edited one per line.
- *
- * A textarea rather than a row of inputs with add and remove buttons: these are lists of city
- * names, and typing one per line is faster than clicking Add sixty times. Blank lines are dropped
- * on the way out, so a trailing newline is not sent as an empty fragment that matches everything.
- */
-function ListField({
-  label,
-  hint,
-  value,
-  onChange,
-  error,
-}: {
-  label: string;
-  hint?: string;
-  value: string[];
-  onChange: (value: string[]) => void;
-  error?: string;
-}) {
-  return (
-    <Field label={label} hint={hint} error={error}>
-      <textarea
-        rows={Math.min(10, Math.max(3, value.length + 1))}
-        value={value.join("\n")}
-        onChange={(event) =>
-          onChange(
-            event.target.value
-              .split("\n")
-              .map((line) => line.trim())
-              .filter((line) => line.length > 0),
-          )
-        }
-        className={`${inputClass(error)} font-mono`}
-      />
-    </Field>
-  );
-}
-
-/**
- * A name-to-pattern map, edited as `name = pattern` lines.
- *
- * One text area rather than paired inputs, for the same reason as `ListField` and one more: these
- * maps are what `profile.json` holds, and editing them in the same shape they are written in means
- * a person moving between the file and this form is reading one format rather than two.
- *
- * A line with no `=` is kept as a name with an empty pattern rather than dropped, so half-typed
- * input does not disappear under the cursor. The API refuses an empty pattern and says which entry
- * it was.
- */
-function MapField({
-  label,
-  hint,
-  keyLabel,
-  value,
-  onChange,
-  error,
-}: {
-  label: string;
-  hint?: string;
-  keyLabel: string;
-  value: Record<string, string>;
-  onChange: (value: Record<string, string>) => void;
-  error?: string;
-}) {
-  const text = Object.entries(value)
-    .map(([name, pattern]) => `${name} = ${pattern}`)
-    .join("\n");
-
-  return (
-    <Field label={label} hint={`${hint ?? ""} One per line, as ${keyLabel} = pattern.`.trim()} error={error}>
-      <textarea
-        rows={Math.min(14, Math.max(3, Object.keys(value).length + 1))}
-        value={text}
-        onChange={(event) => onChange(parseMap(event.target.value))}
-        className={`${inputClass(error)} font-mono`}
-      />
-    </Field>
-  );
-}
-
-/** Reads `name = pattern` lines back into a map, keeping the order they were written in. */
-function parseMap(text: string): Record<string, string> {
-  const entries: Record<string, string> = {};
-  for (const line of text.split("\n")) {
-    if (line.trim().length === 0) continue;
-    const split = line.indexOf("=");
-    const name = (split === -1 ? line : line.slice(0, split)).trim();
-    if (name.length === 0) continue;
-    entries[name] = split === -1 ? "" : line.slice(split + 1).trim();
-  }
-  return entries;
 }
 
 /**
