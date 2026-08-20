@@ -222,7 +222,7 @@ export function AddApplicationDialog({
           <button
             type="submit"
             disabled={busy}
-            className="rounded-[7px] bg-accent px-3.5 py-2 text-[13px] font-semibold text-ink hover:bg-accent-bright disabled:opacity-50"
+            className="rounded-[7px] bg-accent px-3.5 py-2 text-[13px] font-semibold text-on-accent hover:bg-accent-bright disabled:opacity-50"
           >
             {busy ? "Saving…" : "Save"}
           </button>

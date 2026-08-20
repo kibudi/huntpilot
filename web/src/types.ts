@@ -38,26 +38,33 @@ export const STATUSES: Status[] = [
 ];
 
 /**
- * Chroma and hue per status, used to build both the pill background and its text colour.
+ * Lightness, chroma and hue per status, used to build both the pill background and its text.
  *
  * Deriving both from one pattern keeps the six pills visually consistent; picking each colour by
  * hand does not.
  *
- * The hues are the product's own five and nothing else. Gold at rising chroma carries the early
- * pipeline, so saved, applied and interview read as one warming ramp rather than three unrelated
- * badges. Offer breaks out of that ramp into navy on purpose: it is the outcome worth spotting in
- * a full table, and another warm pill would have sat beside interview instead of ending the run.
- * Rejected is tomato, the loudest colour here and the only other place it is spent. Ghosted keeps
- * no hue at all, because no answer is not an outcome.
+ * Lightness is here because the product's palette is five blues spanning about eleven degrees of
+ * hue, and six statuses cannot be told apart inside that. Hue is therefore nearly constant and the
+ * ramp does the work: saved is barely tinted, and each step towards an offer is darker and more
+ * saturated than the last, so the pipeline reads as progress down a single column.
+ *
+ * Rejected breaks the ramp by going dark rather than warm. There is no red in this palette, so the
+ * one outcome that has to stop the eye is the only pill with a dark fill and light text — a
+ * contrast reversal is visible at a glance in a way another blue would not be.
+ *
+ * Ghosted keeps no chroma at all, because no answer is not an outcome.
  */
-export const STATUS_COLOR: Record<Status, { c: number; h: number }> = {
-  saved: { c: 0.03, h: 92 },
-  applied: { c: 0.11, h: 92 },
-  interview: { c: 0.14, h: 55 },
-  offer: { c: 0.1, h: 252 },
-  rejected: { c: 0.18, h: 32 },
-  ghosted: { c: 0, h: 0 },
+export const STATUS_COLOR: Record<Status, { l: number; c: number; h: number }> = {
+  saved: { l: 0.95, c: 0.02, h: 232 },
+  applied: { l: 0.9, c: 0.05, h: 190 },
+  interview: { l: 0.82, c: 0.08, h: 218 },
+  offer: { l: 0.7, c: 0.1, h: 234 },
+  rejected: { l: 0.33, c: 0.06, h: 245 },
+  ghosted: { l: 0.9, c: 0, h: 0 },
 };
+
+/** Below this lightness a pill needs light text on it rather than dark. */
+export const PILL_FLIP = 0.55;
 
 /**
  * A job posting the board tracker swept from a company's job board, as the API returns it.

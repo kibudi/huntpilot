@@ -1,4 +1,4 @@
-import { STATUS_COLOR, STATUSES, type Status } from "../types";
+import { PILL_FLIP, STATUS_COLOR, STATUSES, type Status } from "../types";
 
 /**
  * The status cell: a native select styled as a coloured pill.
@@ -16,7 +16,8 @@ export function StatusSelect({
   onChange: (next: Status) => void;
   disabled?: boolean;
 }) {
-  const { c, h } = STATUS_COLOR[value];
+  const { l, c, h } = STATUS_COLOR[value];
+  const dark = l < PILL_FLIP;
 
   return (
     <select
@@ -26,8 +27,10 @@ export function StatusSelect({
       aria-label="Status"
       className="cursor-pointer appearance-none rounded-full py-1 pr-2 pl-2.5 text-xs font-semibold capitalize outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
       style={{
-        background: `oklch(91% ${c * 0.6} ${h})`,
-        color: `oklch(38% ${Math.max(c, 0.01)} ${h})`,
+        background: `oklch(${l * 100}% ${c} ${h})`,
+        color: dark
+          ? `oklch(96% ${c * 0.3} ${h})`
+          : `oklch(38% ${Math.max(c, 0.01)} ${h})`,
       }}
     >
       {STATUSES.map((status) => (

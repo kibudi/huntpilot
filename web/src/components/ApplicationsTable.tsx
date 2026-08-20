@@ -90,7 +90,7 @@ export function ApplicationsTable({
                 <button
                   type="button"
                   onClick={onAdd}
-                  className="mt-3 rounded-[7px] bg-accent px-3.5 py-2 text-[13px] font-semibold text-ink hover:bg-accent-bright"
+                  className="mt-3 rounded-[7px] bg-accent px-3.5 py-2 text-[13px] font-semibold text-on-accent hover:bg-accent-bright"
                 >
                   Add your first application
                 </button>

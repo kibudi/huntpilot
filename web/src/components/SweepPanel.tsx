@@ -16,8 +16,8 @@ const POLL_INTERVAL = 3000;
  * up here as a type error rather than as a run that silently renders unstyled.
  */
 const RUN_LOOK: Record<RunState, { label: string; className: string }> = {
-  running: { label: "Running", className: "bg-accent text-ink" },
-  completed: { label: "Completed", className: "bg-gold text-ink" },
+  running: { label: "Running", className: "bg-accent text-on-accent" },
+  completed: { label: "Completed", className: "bg-chip text-ink" },
   failed: { label: "Failed", className: "bg-danger text-page" },
   abandoned: { label: "Abandoned", className: "bg-ink/15 text-ink-dim" },
 };
@@ -157,7 +157,7 @@ export function SweepPanel({ onSwept }: { onSwept: () => void }) {
             type="button"
             onClick={() => void run()}
             disabled={busy}
-            className="rounded-md bg-accent px-4 py-2 font-medium text-ink transition hover:bg-accent-bright disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-md bg-accent px-4 py-2 font-medium text-on-accent transition hover:bg-accent-bright disabled:cursor-not-allowed disabled:opacity-60"
           >
             {busy ? "Sweeping…" : "Run a sweep"}
           </button>

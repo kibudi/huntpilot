@@ -3,20 +3,27 @@
 /*
  * Design tokens.
  *
- * Five colours carry the whole product, and every one of them does a job:
+ * Five blues carry the whole product, and every one of them does a job:
  *
- * Regal Navy is the text and the strong edges. Lemon Chiffon is the page, warm rather than white
- * so a tool kept open beside a job board all day does not read as another grey admin console.
- * Royal Gold is the quiet structure — rules, chip fills, the resting state of anything selectable.
- * Sandy Brown is the accent that fills: buttons, the active tab, the logo sweep. Tomato is the
- * loudest and is spent sparingly, on what has gone wrong and on the hover that commits an action.
+ * Yale Blue is the text and the strong edges, and its darkest step is what goes on top of a Fresh
+ * Sky fill: the ordinary ink reaches only 4.3:1 there, which is under the 4.5 a body-sized label
+ * needs, and a pale label on that fill is worse still at 2.1.
  *
- * Gold and brown are both here rather than one orange, because a single accent has to be either
- * legible as text or strong as a fill and cannot be both on a pale ground. Gold carries area,
- * brown carries emphasis, and navy carries every word that has to be read.
+ * Yale Blue is the text and the strong edges. Pale Sky is the page and the panels, the lightest
+ * two steps of its own scale, so a card lifts off the page without a second hue. Frozen Water is
+ * the quiet structure — rules, chip fills, the resting state of anything selectable. Fresh Sky is
+ * the accent that fills: buttons, the active tab, the logo sweep. Pacific Blue is the strong rule,
+ * the one edge meant to be noticed.
  *
- * The surfaces are the page colour lifted and deepened rather than new hues, so that panels
- * separate from the page without introducing a sixth colour that belongs to no one.
+ * The scales are used rather than the five defaults alone, because a palette this close in hue
+ * cannot separate a page from a panel from a raised surface by hue at all — only by lightness.
+ * Frozen Water and Fresh Sky sit eleven degrees apart, so anything relying on telling them apart
+ * by colour would fail; what distinguishes them here is how light they are and how much area each
+ * is given.
+ *
+ * There is no warm colour in this palette and so no red. Failure is carried by the darkest two
+ * steps of Yale Blue instead, which reads as gravity rather than as alarm: a destructive button is
+ * near-black on pale blue rather than red, and an error line is the darkest ink on the screen.
  *
  * Fraunces is the display face, shared with the landing page so the product and the page that
  * describes it are recognisably the same thing. It carries the wordmark and the dialog titles and
@@ -25,20 +32,21 @@
  * rather than to whatever the body is using, if the font never arrives.
  */
 @theme {
-  --color-page: #faf0ca;
-  --color-panel: #fdf8e6;
-  --color-raised: #f7e9b8;
-  --color-line: #f4d35e;
-  --color-line-strong: #ee964b;
-  --color-ink: #0d3b66;
-  --color-ink-dim: #2c5f8f;
-  --color-ink-faint: #b8541f;
-  --color-accent: #ee964b;
-  --color-accent-ink: #b8451c;
-  --color-accent-bright: #f95738;
-  --color-gold: #f4d35e;
-  --color-danger: #f95738;
-  --color-danger-ink: #c02e12;
+  --color-page: #ebf7ff;
+  --color-panel: #f5fbff;
+  --color-raised: #e0f0f5;
+  --color-line: #bee9e8;
+  --color-line-strong: #62b6cb;
+  --color-ink: #1b4965;
+  --color-ink-dim: #276a90;
+  --color-ink-faint: #1e4e5a;
+  --color-accent: #5fa8d3;
+  --color-accent-ink: #153a51;
+  --color-accent-bright: #7fbadc;
+  --color-on-accent: #0b1d28;
+  --color-chip: #bee9e8;
+  --color-danger: #0b1d28;
+  --color-danger-ink: #050e14;
 
   --font-display: Fraunces, Georgia, "Times New Roman", serif;
   --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;

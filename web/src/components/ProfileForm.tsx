@@ -156,7 +156,7 @@ export function ProfileForm() {
           type="button"
           onClick={() => void save()}
           disabled={busy}
-          className="rounded-md bg-accent px-4 py-2 font-medium text-ink transition hover:bg-accent-bright disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-md bg-accent px-4 py-2 font-medium text-on-accent transition hover:bg-accent-bright disabled:cursor-not-allowed disabled:opacity-60"
         >
           {busy ? "Saving…" : "Save the profile"}
         </button>
@@ -297,7 +297,7 @@ function ChipField({
         {value.map((word) => (
           <span
             key={word}
-            className="inline-flex items-center gap-1 rounded-full bg-gold px-2 py-0.5 text-xs font-medium text-ink"
+            className="inline-flex items-center gap-1 rounded-full bg-chip px-2 py-0.5 text-xs font-medium text-ink"
           >
             {word}
             <button
