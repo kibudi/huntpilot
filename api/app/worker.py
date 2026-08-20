@@ -17,7 +17,7 @@ from datetime import timedelta
 from celery import Celery
 
 from app.config import settings
-from app.sweep import SweepSummary, run_sweep
+from app.sweep import run_sweep
 
 SWEEP_INTERVAL = timedelta(hours=6)
 """How often the watchlist is swept.
@@ -49,9 +49,21 @@ def sweep_boards() -> dict[str, object]:
     rewrite timestamps for the boards that already answered. A failing board is reported in the
     result rather than raised.
 
+    The sweep records itself as a ``SweepRun`` before this returns, so the scheduled passes show up
+    in the dashboard's history beside the ones started by hand. The task result is therefore a
+    convenience for anyone inspecting Celery rather than the record itself, which is the database's.
+
+    A pass is skipped rather than queued when a sweep is already running — most often one started
+    from the dashboard minutes before Beat fired. Skipping loses nothing: the running pass is
+    reading the same boards this one would have, and waiting for it only to sweep again would
+    rewrite timestamps that are the evidence closure is inferred from.
+
     Returns:
-        The ``SweepSummary`` as plain data — a task result is serialised to JSON, and Celery
-        cannot reconstruct a Pydantic model from it.
+        The ``SweepRun`` as plain data — a task result is serialised to JSON, and Celery cannot
+        reconstruct a Pydantic model from it — or a note that the pass was skipped.
     """
-    summary: SweepSummary = run_sweep()
-    return summary.model_dump(mode="json")
+    run = run_sweep()
+    if run is None:
+        return {"skipped": "a sweep was already running"}
+    recorded: dict[str, object] = run.model_dump(mode="json")
+    return recorded

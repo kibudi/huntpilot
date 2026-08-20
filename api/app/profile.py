@@ -6,7 +6,7 @@ with, how much experience it may ask for — used to be a constant inside ``rele
 made retuning it a source edit for its owner, when retuning is the thing most often wanted: a
 sweep that returns nothing is fixed by lowering a threshold, not by changing code.
 
-A profile is one JSON file holding all of it, read and validated once at startup. JSON rather than
+A profile is one JSON file holding all of it. JSON rather than
 YAML because the standard library already reads it and Pydantic already validates it, and a
 configuration format is a poor reason to add a dependency. Validation is the point of the model
 rather than a formality: a profile is the one input that can fail *quietly*: a misspelt field or a
@@ -20,10 +20,19 @@ the places they name a technology at all, which is why "Go" is only counted befo
 replaced. The cost is that a profile can carry a broken pattern, so every pattern is compiled as
 the file loads: a typo is a startup failure naming the file, not an exception in the middle of a
 sweep six hours later.
+
+The file is the *default*, not the running search. Once the dashboard can edit the profile, a file
+read at startup cannot be the source of truth: an edit would take effect at the next restart, and
+the API would be writing into its own package directory to make one. So the file seeds a stored
+profile the first time a database is used, and the stored document is read from then on. The rules
+do not move with it — everything written is validated by the same ``Profile``, so an edit that
+empties the role families or breaks a pattern is refused with a reason rather than saved and
+quietly keeping nothing.
 """
 
 import json
 import re
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -32,6 +41,7 @@ from pydantic import (
     BeforeValidator,
     ConfigDict,
     Field,
+    PlainSerializer,
     StringConstraints,
     field_validator,
     model_validator,
@@ -39,6 +49,7 @@ from pydantic import (
 from pydantic import ValidationError as PydanticValidationError
 
 from app.config import settings
+from app.models import ProfileSlot, SearchProfile
 
 
 def _compile(value: Any) -> re.Pattern[str]:
@@ -73,7 +84,25 @@ def _compile(value: Any) -> re.Pattern[str]:
         raise ValueError(f"{value!r} is not a valid regular expression: {error}") from error
 
 
-Pattern = Annotated[re.Pattern[str], BeforeValidator(_compile)]
+def _source(pattern: re.Pattern[str]) -> str:
+    """Returns the pattern as its author wrote it, for storing and for sending over the wire.
+
+    The inverse of ``_compile``, and the reason a profile can make the round trip out to a client,
+    back through validation and into the database without anyone restating the eight fields it
+    holds: dumping a ``Profile`` produces exactly the JSON a profile file contains.
+
+    Args:
+        pattern: The compiled pattern.
+
+    Returns:
+        Its source text. The ``re.IGNORECASE`` flag ``_compile`` applies is deliberately not
+        written back in, because ``_compile`` applies it again on the way in — round-tripping it
+        as ``(?i)`` would slowly grow the stored pattern by one prefix per edit.
+    """
+    return pattern.pattern
+
+
+Pattern = Annotated[re.Pattern[str], BeforeValidator(_compile), PlainSerializer(_source)]
 """A regular expression as a profile states it: a string in the file, compiled in the model."""
 
 FamilyName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, to_lower=True)]
@@ -110,9 +139,10 @@ class Profile(BaseModel):
     extras would leave the real field at its default, and every default here is a filter that
     silently changes what a sweep keeps.
 
-    ``frozen=True`` because the profile is read once at startup and shared by every caller. A
+    ``frozen=True`` because a profile is read once and then handed to every filter in that pass. A
     filter that quietly retuned itself mid-sweep would make two postings in the same reading
-    incomparable.
+    incomparable — which matters more now that the profile can be edited while a sweep is running:
+    the pass keeps the profile it started with, and the edit applies to the next one.
 
     Field order is meaningful in two places and preserved by both JSON and Python dicts:
     ``role_families`` is tried in the order written, and ``known`` and ``unknown`` decide the order
@@ -279,15 +309,104 @@ def load_profile(path: Path) -> Profile:
         raise ProfileError(f"the profile at {path} is not usable:\n{error}") from error
 
 
-profile = load_profile(settings.profile_path)
-"""The profile every entry point filters with, loaded once as this module is imported.
+default_profile = load_profile(settings.profile_path)
+"""The committed profile, loaded once as this module is imported, and what a fresh database gets.
 
-Loaded at import, like ``settings``, so that a broken profile stops the API, the worker and a
-hand-run sweep at startup with the file named. Deferring the read to the first sweep would make a
-typo surface six hours later, inside the one code path where an exception is caught and counted as
-a board failure.
+Loaded at import, like ``settings``, so that a broken file stops the API, the worker and a
+hand-run sweep at startup with the file named. Deferring the read would make a typo surface six
+hours later, inside the one code path where an exception is caught and counted as a board failure.
 
-Only entry points read this — ``main`` and ``sweep``. The filters themselves take a profile as an
-argument and never import it, which is what keeps them testable against a profile other than this
-one.
+Nothing filters with this directly any more: it is the seed for ``active_profile``, which is what
+the sweep and the postings endpoint read. It stays loaded at import anyway, because the file is
+still the shipped default and a checkout whose default profile is broken should say so at startup
+rather than at the first sweep against an empty database.
 """
+
+
+async def active_profile() -> Profile:
+    """Returns the stored profile, seeding it from the committed file if there is none yet.
+
+    Read fresh on every sweep and every request that filters, rather than cached at startup, which
+    is the entire point of moving the profile into the database: an edit made in the dashboard
+    changes what the next sweep keeps and how the next posting list is classified, with nothing
+    restarted.
+
+    Seeding on read rather than only at startup means the first sweep on a fresh database works
+    whether it was started by the API, by the worker or by hand — none of which share a startup —
+    and it costs one extra query exactly once per database.
+
+    Returns:
+        The stored profile, validated by the same rules as the file.
+
+    Raises:
+        ProfileError: If the stored document is no longer a usable profile. That should be
+            unreachable, since every write validates first, but a document edited in the database
+            by hand is the one way round that, and serving a silently broken filter is worse than
+            failing.
+    """
+    document = await SearchProfile.find_one(SearchProfile.slot == ProfileSlot.ACTIVE)
+    if document is None:
+        document = await _seed_profile()
+    try:
+        return Profile.model_validate(document.search)
+    except PydanticValidationError as error:
+        raise ProfileError(f"the stored profile is not usable:\n{error}") from error
+
+
+async def _seed_profile() -> SearchProfile:
+    """Writes the committed profile into an empty database and returns the document.
+
+    An upsert with ``$setOnInsert`` rather than a read followed by an insert, so that two processes
+    starting against a fresh database at the same moment cannot both seed. The one that arrives
+    second matches the existing document and writes nothing, rather than being refused by the
+    uniqueness index and having to work out whether that meant a race or a real fault.
+
+    Returns:
+        The seeded profile document.
+
+    Raises:
+        ProfileError: If the document is gone again by the time it is read back, which can only
+            mean something else is deleting profiles as this one starts up.
+    """
+    now = datetime.now(UTC)
+    await SearchProfile.get_pymongo_collection().update_one(
+        {"slot": ProfileSlot.ACTIVE.value},
+        {
+            "$setOnInsert": {
+                "search": default_profile.model_dump(mode="json"),
+                "created_at": now,
+                "updated_at": now,
+            }
+        },
+        upsert=True,
+    )
+    document = await SearchProfile.find_one(SearchProfile.slot == ProfileSlot.ACTIVE)
+    if document is None:
+        raise ProfileError("the profile seeded from the committed file disappeared immediately")
+    return document
+
+
+async def store_profile(replacement: Profile) -> None:
+    """Replaces the stored profile with one that has already been validated.
+
+    Takes a ``Profile`` rather than the raw JSON so that it is impossible to store something
+    unvalidated: the argument cannot be constructed without every pattern compiling and every
+    whitelist being non-empty. What is written is the model's own dump, so the stored profile is
+    the normalised one — location fragments lower-cased, an omitted ``unknown`` filled in — and a
+    client reading back what it just sent sees what the filters will actually use.
+
+    A single upsert rather than a read followed by a write, for the same reason as seeding: it is
+    one round trip, and it works whether or not the database has been seeded yet.
+
+    Args:
+        replacement: The new search, already validated.
+    """
+    now = datetime.now(UTC)
+    await SearchProfile.get_pymongo_collection().update_one(
+        {"slot": ProfileSlot.ACTIVE.value},
+        {
+            "$set": {"search": replacement.model_dump(mode="json"), "updated_at": now},
+            "$setOnInsert": {"created_at": now},
+        },
+        upsert=True,
+    )

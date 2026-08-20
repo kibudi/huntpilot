@@ -86,7 +86,15 @@ def berlin_profile() -> Profile:
 async def db() -> AsyncIterator[AsyncMongoClient[dict[str, Any]]]:
     """Connects to the throwaway test database and leaves it empty for the test.
 
-    The database is dropped afterwards so a failed run leaves nothing behind.
+    Isolation comes from emptying the collections *before* each test, never from dropping the
+    database after one. A drop is acknowledged before the server has finished it, so against a
+    remote cluster the drop issued for one test can still be landing while the next has begun
+    inserting — deleting that test's data underneath it. It surfaced as documents that a count
+    could see and a query could not, in whichever test happened to be running when the drop caught
+    up, which is why it looked like an unrelated regression.
+
+    The database is therefore left in place between runs. It holds only what the last test wrote,
+    and the next run empties it before touching anything.
     """
     client = await init_db(db_name=TEST_DB)
     try:
@@ -94,7 +102,6 @@ async def db() -> AsyncIterator[AsyncMongoClient[dict[str, Any]]]:
             await model.get_pymongo_collection().delete_many({})
         yield client
     finally:
-        await client.drop_database(TEST_DB)
         await client.close()
 
 

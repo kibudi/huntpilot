@@ -10,9 +10,9 @@ from datetime import date, datetime
 from enum import StrEnum
 from typing import Annotated, ClassVar
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, model_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
-from app.models import ATS, PostingStatus, Status
+from app.models import ATS, PostingStatus, Status, SweepState, SweepSummary
 
 ObjectIdStr = Annotated[str, BeforeValidator(str)]
 """A MongoDB ObjectId rendered as a string, since JSON has no such type.
@@ -166,3 +166,65 @@ class PostingRead(BaseModel):
     first_seen_at: datetime
     last_seen_at: datetime
     closed_at: datetime | None
+
+
+class ProfileBody(BaseModel):
+    """The search profile as it travels in both directions: every pattern still a string.
+
+    The one schema in this file used for a request *and* a response, against the rule that separates
+    the two. The rule exists because ``id``, ``created_at`` and ``updated_at`` are forbidden on
+    input and guaranteed on output, and a profile publishes none of them: it is a singleton, so an
+    identifier says nothing a client can use, and the timestamps belong to the row rather than to
+    the search. With nothing asymmetric left, two classes would be one shape written twice — and
+    the symmetry is worth having, because the dashboard's editor is a form filled from ``GET`` and
+    posted back to ``PUT``, so anything present in one direction and absent in the other is a trap.
+
+    Deliberately carries the *shape* and not the rules. There are no minimum lengths or bounds
+    here, even though ``Profile`` has several: this says what a profile looks like so FastAPI can
+    describe and parse it, while ``Profile`` decides whether it is a search worth running. Copying
+    the constraints would give two answers to that question, and the copy is the one that would
+    fall behind.
+
+    Patterns are strings, exactly as ``profile.json`` writes them, because that is what a person
+    edits and what JSON can carry. They are compiled on the way in, and a broken one comes back as
+    a rejection naming the technology or family it belongs to.
+
+    Field order matches ``Profile``: ``role_families`` is tried in the order given, so the order a
+    client sends is a decision it is making.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    local_fragments: list[str]
+    remote_fragments: list[str]
+    seniority_markers: str
+    role_families: dict[str, str]
+    known: dict[str, str]
+    unknown: dict[str, str] = Field(default_factory=dict)
+    min_tech_score: float
+    max_years: int
+
+
+class SweepRunRead(BaseModel):
+    """One recorded sweep as the API reports it.
+
+    ``summary`` and ``finished_at`` are null exactly while the sweep is running, and both are
+    filled the moment it is not — so a client polling this has one thing to test rather than a
+    state to interpret. ``error`` is the reverse: null unless the pass could not be completed at
+    all.
+
+    ``SweepSummary`` is published as it is stored rather than restated as a response schema of its
+    own. The two reasons the other schemas here exist do not apply to it: it has no ``_id``, and
+    every one of its fields is required with a default, so it is already the same shape in both
+    directions. Copying it would mean the numbers a sweep counts and the numbers a client reads
+    could drift.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: ObjectIdStr
+    state: SweepState
+    started_at: datetime
+    finished_at: datetime | None
+    summary: SweepSummary | None
+    error: str | None

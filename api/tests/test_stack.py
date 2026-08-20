@@ -7,7 +7,7 @@ verdict belongs to the file.
 """
 
 from app.profile import Profile
-from app.profile import profile as DEFAULT_PROFILE
+from app.profile import default_profile as DEFAULT_PROFILE
 from app.stack import minimum_years, tech_match
 
 
