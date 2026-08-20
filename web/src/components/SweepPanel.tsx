@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, fetchSweeps, startSweep } from "../api";
 import { exactTime, relativeTime } from "../format";
 import type { HistoryState, SweepState } from "../state";
+import { ProfileForm } from "./ProfileForm";
 import type { BoardFailure, SweepRun, SweepState as RunState } from "../types";
 
 /** How often a running sweep is polled for, in milliseconds. */
@@ -159,6 +160,8 @@ export function SweepPanel() {
         <h2 className="font-display text-lg text-ink">History</h2>
         <HistoryList state={history} />
       </div>
+
+      <ProfileForm />
     </section>
   );
 }

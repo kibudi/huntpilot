@@ -1,4 +1,4 @@
-import type { Application, Posting, SweepRun } from "./types";
+import type { Application, Posting, Profile, SweepRun } from "./types";
 
 /** Which tab the dashboard is showing. */
 export type Tab = "applications" | "board" | "sweep";
@@ -118,3 +118,33 @@ export type HistoryState =
   | { kind: "loading" }
   | { kind: "error"; message: string }
   | { kind: "ready"; runs: SweepRun[] };
+
+/**
+ * The profile editor's state.
+ *
+ * `saved` is separate from `ready` so the form can say a write landed without a banner that never
+ * goes away: it carries the same draft and is replaced by `ready` on the next edit.
+ *
+ * `rejected` carries the API's own field errors rather than a single message, because a profile
+ * has sixty patterns in it and "invalid" without naming one is not something a person can act on.
+ * Nothing decides those here — the browser has no copy of the rules and asks the API instead.
+ */
+export type ProfileState =
+  | { kind: "loading" }
+  | { kind: "error"; message: string }
+  | { kind: "ready"; draft: Profile }
+  | { kind: "saving"; draft: Profile }
+  | { kind: "saved"; draft: Profile }
+  | { kind: "rejected"; draft: Profile; errors: FieldError[] };
+
+/**
+ * One complaint from the API about one field.
+ *
+ * `field` is the top-level profile field the API named, which is what the form highlights; `detail`
+ * is the rest of the path plus the message, so a broken pattern says which technology it belongs
+ * to rather than only that the map is wrong.
+ */
+export interface FieldError {
+  field: string;
+  detail: string;
+}

@@ -169,3 +169,32 @@ export interface BoardFailure {
   token: string;
   error: string;
 }
+
+/**
+ * The search every sweep is run against, as the API returns it and accepts it back.
+ *
+ * One interface for both directions because the API publishes one shape for both, which is what
+ * makes the editor work: it is filled from a `GET` and posted back to a `PUT`, so a field present
+ * in one direction and absent in the other would be a trap.
+ *
+ * Patterns are strings, exactly as they are written in the profile file. They are compiled by the
+ * API, never here — the browser does not filter anything and has no use for a compiled pattern.
+ */
+export interface Profile {
+  /** City and district spellings that count as local. Matched against lower-cased text. */
+  local_fragments: string[];
+  /** Wordings that count as advertised remote. */
+  remote_fragments: string[];
+  /** One pattern whose match in a title rules the posting out as too senior. */
+  seniority_markers: string;
+  /** Role family name to the pattern that recognises it, tried in the order given. */
+  role_families: Record<string, string>;
+  /** Technology name to the pattern that recognises it, for technologies already known. */
+  known: Record<string, string>;
+  /** The same, for technologies counted against a posting rather than for it. */
+  unknown: Record<string, string>;
+  /** Share of a posting's named technologies that must be known, as a fraction of one. */
+  min_tech_score: number;
+  /** The most years of experience a posting may ask for and still be kept. */
+  max_years: number;
+}
