@@ -3,27 +3,24 @@
 /*
  * Design tokens.
  *
- * Five blues carry the whole product, and every one of them does a job:
+ * Warm paper and garden green. The page is a cream rather than a white or a blue, so a tool kept
+ * open beside a job board all day reads as paper and not as an admin console; the ink is a deep
+ * pine rather than black, which keeps long tables from looking printed on.
  *
- * Yale Blue is the text and the strong edges, and its darkest step is what goes on top of a Fresh
- * Sky fill: the ordinary ink reaches only 4.3:1 there, which is under the 4.5 a body-sized label
- * needs, and a pale label on that fill is worse still at 2.1.
+ * Green is the accent because it is the one hue that says "this went well" without shouting, which
+ * is most of what this product has to say: a sweep finished, a posting is still open, an
+ * application moved forward. Sage is the same hue drained of most of its chroma and carries the
+ * structure — rules, chip fills, the resting state of anything selectable — so the quiet parts of
+ * the screen belong to the accent's family instead of being grey.
  *
- * Yale Blue is the text and the strong edges. Pale Sky is the page and the panels, the lightest
- * two steps of its own scale, so a card lifts off the page without a second hue. Frozen Water is
- * the quiet structure — rules, chip fills, the resting state of anything selectable. Fresh Sky is
- * the accent that fills: buttons, the active tab, the logo sweep. Pacific Blue is the strong rule,
- * the one edge meant to be noticed.
+ * Raspberry is the only colour here that is not green or cream, and it exists because the previous
+ * palette had no warm colour and had to spell failure as darkness. A destructive button and a
+ * rejection now have a hue of their own, spent nowhere else, so red on this screen always means
+ * one thing.
  *
- * The scales are used rather than the five defaults alone, because a palette this close in hue
- * cannot separate a page from a panel from a raised surface by hue at all — only by lightness.
- * Frozen Water and Fresh Sky sit eleven degrees apart, so anything relying on telling them apart
- * by colour would fail; what distinguishes them here is how light they are and how much area each
- * is given.
- *
- * There is no warm colour in this palette and so no red. Failure is carried by the darkest two
- * steps of Yale Blue instead, which reads as gravity rather than as alarm: a destructive button is
- * near-black on pale blue rather than red, and an error line is the darkest ink on the screen.
+ * Every pairing below was measured rather than eyeballed. Two values are darker than they look
+ * like they want to be: the muted label, which sat at 4.2:1 against the page, and the accent's
+ * hover, which had to go down rather than up to keep a pale label on it above 4.5:1.
  *
  * Fraunces is the display face, shared with the landing page so the product and the page that
  * describes it are recognisably the same thing. It carries the wordmark and the dialog titles and
@@ -32,21 +29,21 @@
  * rather than to whatever the body is using, if the font never arrives.
  */
 @theme {
-  --color-page: #ebf7ff;
-  --color-panel: #f5fbff;
-  --color-raised: #e0f0f5;
-  --color-line: #bee9e8;
-  --color-line-strong: #62b6cb;
-  --color-ink: #1b4965;
-  --color-ink-dim: #276a90;
-  --color-ink-faint: #1e4e5a;
-  --color-accent: #5fa8d3;
-  --color-accent-ink: #153a51;
-  --color-accent-bright: #7fbadc;
-  --color-on-accent: #0b1d28;
-  --color-chip: #bee9e8;
-  --color-danger: #0b1d28;
-  --color-danger-ink: #050e14;
+  --color-page: #f4f1e4;
+  --color-panel: #fdfbf2;
+  --color-raised: #eae6d4;
+  --color-line: #cddcc6;
+  --color-line-strong: #8fb98c;
+  --color-ink: #1c3a30;
+  --color-ink-dim: #3d6353;
+  --color-ink-faint: #456347;
+  --color-accent: #2f7d4f;
+  --color-accent-ink: #245f3d;
+  --color-accent-bright: #215f3a;
+  --color-on-accent: #fdfbf2;
+  --color-chip: #cddcc6;
+  --color-danger: #9e2b3f;
+  --color-danger-ink: #7e1f30;
 
   --font-display: Fraunces, Georgia, "Times New Roman", serif;
   --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;

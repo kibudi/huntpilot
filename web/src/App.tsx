@@ -633,8 +633,8 @@ function Logo() {
           y2="12"
           gradientUnits="userSpaceOnUse"
         >
-          <stop offset="0" stopColor="#5fa8d3" stopOpacity="0.85" />
-          <stop offset="1" stopColor="#5fa8d3" stopOpacity="0" />
+          <stop offset="0" stopColor="#2f7d4f" stopOpacity="0.85" />
+          <stop offset="1" stopColor="#2f7d4f" stopOpacity="0" />
         </linearGradient>
       </defs>
       <circle
@@ -649,11 +649,11 @@ function Logo() {
       <path d="M32 32 L32 5 A27 27 0 0 1 55.4 18.5 Z" fill="url(#sweep)" />
       <path
         d="M32 32 L55.4 18.5"
-        stroke="#5fa8d3"
+        stroke="#2f7d4f"
         strokeWidth="4"
         strokeLinecap="round"
       />
-      <circle cx="44" cy="24" r="5" fill="#5fa8d3" />
+      <circle cx="44" cy="24" r="5" fill="#2f7d4f" />
     </svg>
   );
 }

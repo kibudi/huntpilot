@@ -43,24 +43,28 @@ export const STATUSES: Status[] = [
  * Deriving both from one pattern keeps the six pills visually consistent; picking each colour by
  * hand does not.
  *
- * Lightness is here because the product's palette is five blues spanning about eleven degrees of
- * hue, and six statuses cannot be told apart inside that. Hue is therefore nearly constant and the
- * ramp does the work: saved is barely tinted, and each step towards an offer is darker and more
- * saturated than the last, so the pipeline reads as progress down a single column.
+ * The early pipeline is one hue getting stronger. Saved is barely tinted, applied and interview
+ * are the same green with more chroma and less light, so the first three read as one ramp rather
+ * than three unrelated badges — the eye follows a column of them down a table without having to
+ * decode a legend.
  *
- * Rejected breaks the ramp by going dark rather than warm. There is no red in this palette, so the
- * one outcome that has to stop the eye is the only pill with a dark fill and light text — a
- * contrast reversal is visible at a glance in a way another blue would not be.
+ * Offer ends that ramp by crossing into light text on a deep green. A reversal is visible at a
+ * glance in a way a fourth step of the same ramp would not be, and an offer is the one row worth
+ * spotting in a full table.
+ *
+ * Rejected is the product's raspberry, the only hue here that is not green. It is spent on nothing
+ * else, so red on this screen always means the same thing — which is what the previous palette
+ * could not do, having no warm colour and no choice but to spell a rejection as darkness.
  *
  * Ghosted keeps no chroma at all, because no answer is not an outcome.
  */
 export const STATUS_COLOR: Record<Status, { l: number; c: number; h: number }> = {
-  saved: { l: 0.95, c: 0.02, h: 232 },
-  applied: { l: 0.9, c: 0.05, h: 190 },
-  interview: { l: 0.82, c: 0.08, h: 218 },
-  offer: { l: 0.7, c: 0.1, h: 234 },
-  rejected: { l: 0.33, c: 0.06, h: 245 },
-  ghosted: { l: 0.9, c: 0, h: 0 },
+  saved: { l: 0.95, c: 0.02, h: 110 },
+  applied: { l: 0.9, c: 0.05, h: 150 },
+  interview: { l: 0.82, c: 0.09, h: 152 },
+  offer: { l: 0.52, c: 0.13, h: 152 },
+  rejected: { l: 0.87, c: 0.08, h: 18 },
+  ghosted: { l: 0.91, c: 0, h: 0 },
 };
 
 /** Below this lightness a pill needs light text on it rather than dark. */
