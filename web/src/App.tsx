@@ -644,16 +644,27 @@ function Logo() {
         fill="none"
         stroke="currentColor"
         strokeOpacity="0.28"
-        strokeWidth="4"
+        strokeWidth="3"
+      />
+      <circle
+        cx="32"
+        cy="32"
+        r="15.5"
+        fill="none"
+        stroke="currentColor"
+        strokeOpacity="0.18"
+        strokeWidth="3"
       />
       <path d="M32 32 L32 5 A27 27 0 0 1 55.4 18.5 Z" fill="url(#sweep)" />
       <path
         d="M32 32 L55.4 18.5"
         stroke="#2f7d4f"
-        strokeWidth="4"
+        strokeWidth="3.5"
         strokeLinecap="round"
       />
       <circle cx="44" cy="24" r="5" fill="#2f7d4f" />
+      <circle cx="41" cy="45" r="2.8" fill="#9e2b3f" />
+      <circle cx="20" cy="42" r="2.6" fill="#8fb98c" />
     </svg>
   );
 }

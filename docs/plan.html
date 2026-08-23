@@ -10,11 +10,26 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css">
 
   <style>
+    /*
+      The deck stays dark where the product is warm paper, because a slide is read across a room
+      and a cream field at that size is glare. It is the product's family all the same: the chrome
+      is pine rather than neutral grey, and the three accents are the palette lightened until they
+      carry on a dark ground, since garden and raspberry at their page weights disappear on it.
+
+      The amber this replaced was the one colour in the repository that belonged to no palette.
+    */
     :root {
-      --accent: #6ea8fe;
-      --good: #22c55e;
-      --warn: #f59e0b;
+      --accent: #8fb98c;
+      --good: #5fb87f;
+      --warn: #d9738a;
+      --deck: #12201b;
+      --deck-raised: #182a22;
+      --deck-line: #2c453a;
+      --deck-muted: #9db3a2;
+      --deck-faint: #6f8a78;
     }
+
+    .reveal-viewport { background: var(--deck); }
 
     .reveal { font-size: 30px; }
     .reveal h1, .reveal h2, .reveal h3 { text-transform: none; letter-spacing: -0.02em; }
@@ -24,7 +39,7 @@
     .reveal section.center { text-align: center; }
 
     .reveal .accent { color: var(--accent); }
-    .reveal .muted  { color: #8b94a3; }
+    .reveal .muted  { color: var(--deck-muted); }
     .reveal .good   { color: var(--good); }
     .reveal .warn   { color: var(--warn); }
 
@@ -43,8 +58,8 @@
       font-size: .5em;
     }
     .reveal pre code {
-      background: #14161a;
-      border: 1px solid #2a2f38;
+      background: var(--deck-raised);
+      border: 1px solid var(--deck-line);
       border-radius: 8px;
       padding: 1em;
       max-height: none;
@@ -67,22 +82,22 @@
     .pipeline .step {
       flex: 1 1 0;
       min-width: 5em;
-      border: 1px solid #2a2f38;
+      border: 1px solid var(--deck-line);
       border-radius: 8px;
       padding: .5em;
       text-align: center;
       font-size: .62em;
-      background: #1b1e24;
+      background: var(--deck-raised);
     }
     .pipeline .step b { display: block; color: var(--accent); }
 
     .status-done   { color: var(--good); }
     .status-now    { color: var(--warn); }
-    .status-todo   { color: #6b7280; }
+    .status-todo   { color: var(--deck-faint); }
 
     .footnote {
       font-size: .6em;
-      color: #8b94a3;
+      color: var(--deck-muted);
       margin-top: 1.2em;
     }
   </style>
