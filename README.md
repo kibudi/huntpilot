@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/kibudi/huntpilot/actions/workflows/ci.yml/badge.svg)](https://github.com/kibudi/huntpilot/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-2f7d4f.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-138-2f7d4f.svg)](api/tests)
+[![Tests](https://img.shields.io/badge/tests-172-2f7d4f.svg)](api/tests)
 
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![MongoDB](https://img.shields.io/badge/MongoDB-47A248?logo=mongodb&logoColor=white)
@@ -39,7 +39,7 @@ A job-application tracker that watches company job boards on a schedule and repo
 - Run a sweep on demand and edit the search profile from the dashboard, no restart.
 - Runs entirely **locally and free**: `docker compose up` starts the API, the dashboard, Redis, a
   Celery worker and Beat.
-- 138 tests, `ruff`, `mypy --strict` and the frontend build, all enforced in CI.
+- 172 tests, `ruff`, `mypy --strict` and the frontend build, all enforced in CI.
 
 ## The dashboard
 
@@ -187,7 +187,7 @@ Vite proxies `/api` to port 8000, so the browser sees one origin either way.
 
 ```sh
 cd api
-uv run pytest                 # 138 tests; most need a live MongoDB
+uv run pytest                 # 172 tests; most need a live MongoDB
 uv run mypy app tests         # strict
 uv run ruff check app tests
 uv run python -m app.sweep    # one sweep now, printed as JSON
@@ -212,6 +212,10 @@ because Beanie cannot construct a `Document` before `init_beanie` has reached a 
 | `PATCH` | `/api/applications/{id}` | change one; only fields sent are written; `409` if that `url` is already tracked |
 | `DELETE` | `/api/applications/{id}` | remove one permanently; `204`, or `404` if already gone |
 | `GET` | `/api/postings` | roles swept from company boards, newest discovery first; `?status=open\|closed` narrows it |
+| `GET` | `/api/profile` | the search every sweep filters by |
+| `PUT` | `/api/profile` | replace it whole; rejected with the reason if invalid, and live on the next sweep with no restart |
+| `GET` | `/api/sweeps` | sweep history, newest first, with what each pass found |
+| `POST` | `/api/sweeps` | run one now; refused while another is already running |
 
 </details>
 
