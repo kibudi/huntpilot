@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="1200" height="360" role="img" aria-labelledby="funnel-title funnel-desc">
+  <title id="funnel-title">What one sweep of 28 job boards leaves behind</title>
+  <desc id="funnel-desc">A horizontal bar chart of four stages. 1,026 postings fetched from 28 boards; 290 survive the location gate; 130 survive the title gate; 7 survive the stack and years gate.</desc>
+
+  <!--
+    The chart every well-known tool puts at the top of its README is a benchmark: one measurement
+    that cannot be faked by writing better prose. This is that measurement for a job tracker. The
+    tracking half of the product is unremarkable and a chart of it would prove nothing, so the
+    figure shown is the filter.
+
+    Bars are drawn to true scale, which is why the last one is a sliver. Giving 7 a readable
+    minimum width would flatter the result and destroy the only thing the chart is for.
+
+    Numbers are the first full sweep recorded in docs/board-tracker.md. Retuning a gate makes them
+    stale; re-measure rather than nudge.
+  -->
+
+  <defs>
+    <style>
+      .sans { font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+      .name { font-size: 26px; font-weight: 600; fill: #1c3a30; }
+      .gate { font-size: 18px; fill: #456347; }
+      .val  { font-size: 26px; font-weight: 700; fill: #245f3d; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="360" fill="#f4f1e4"/>
+
+  <text class="sans name" x="280" y="64"  text-anchor="end">fetched</text>
+  <text class="sans gate" x="280" y="88"  text-anchor="end">28 boards</text>
+  <rect x="310" y="48" width="800" height="44" rx="4" fill="#8fb98c"/>
+  <text class="sans val"  x="1124" y="80">1,026</text>
+
+  <text class="sans name" x="280" y="139" text-anchor="end">in reach</text>
+  <text class="sans gate" x="280" y="163" text-anchor="end">gate 3 &#183; location</text>
+  <rect x="310" y="123" width="226" height="44" rx="4" fill="#8fb98c"/>
+  <text class="sans val"  x="550" y="155">290</text>
+
+  <text class="sans name" x="280" y="214" text-anchor="end">right kind of role</text>
+  <text class="sans gate" x="280" y="238" text-anchor="end">gate 5 &#183; title</text>
+  <rect x="310" y="198" width="101" height="44" rx="4" fill="#8fb98c"/>
+  <text class="sans val"  x="425" y="230">130</text>
+
+  <text class="sans name" x="280" y="289" text-anchor="end">worth reading</text>
+  <text class="sans gate" x="280" y="313" text-anchor="end">gate 5b &#183; stack &amp; years</text>
+  <rect x="310" y="273" width="6" height="44" rx="2" fill="#2f7d4f"/>
+  <text class="sans val"  x="330" y="305">7</text>
+</svg>
