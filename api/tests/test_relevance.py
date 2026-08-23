@@ -9,7 +9,7 @@ functions are filters rather than one person's preferences written out longhand.
 
 from app.boards import BoardPosting
 from app.profile import Profile
-from app.profile import profile as DEFAULT_PROFILE
+from app.profile import default_profile as DEFAULT_PROFILE
 from app.relevance import (
     fits_stack,
     in_scope_location,

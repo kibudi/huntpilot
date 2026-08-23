@@ -5,7 +5,7 @@ can even be constructed. Tests therefore need a live MongoDB and run against a t
 never the configured one.
 
 Because ``init_beanie`` binds the Document classes process-globally, tests cannot be isolated by
-scoping a connection per test the way a SQLAlchemy session would be. Isolation comes from emptying
+scoping a connection per test the way a SQLAlchemy session would be. Isolation comes from dropping
 the collections before each test instead, and the suite must not run in parallel.
 """
 
@@ -16,7 +16,8 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from pymongo import AsyncMongoClient
 
-from app.db import DOCUMENT_MODELS, init_db
+from app.config import settings
+from app.db import init_db
 from app.main import app
 from app.profile import Profile
 
@@ -59,22 +60,30 @@ def berlin_profile() -> Profile:
         {
             "local_fragments": ["Berlin", "germany", "münchen", "munich", "hamburg"],
             "remote_fragments": ["remote", "anywhere"],
-            "seniority_markers": r"\b(principal|staff|head of|director|vp|chief)\b",
+            "seniority_markers": ["principal", "staff", "head of", "director", "vp", "chief"],
             "role_families": {
-                "backend": r"\b(back[ -]?end|go(lang)? (developer|engineer))\b",
-                "distributed systems": r"\bdistributed systems\b",
+                "backend": [
+                    "back end",
+                    "back-end",
+                    "backend",
+                    "go developer",
+                    "go engineer",
+                    "golang developer",
+                    "golang engineer",
+                ],
+                "distributed systems": ["distributed systems"],
             },
             "known": {
-                "go": r"\bgolang\b|\bgo\b(?= developer| engineer| programming)",
-                "grpc": r"\bgrpc\b",
-                "kubernetes": r"kubernetes|\bk8s\b",
-                "postgresql": r"postgres(ql)?",
+                "go": ["golang", "go developer", "go engineer", "go programming"],
+                "grpc": ["grpc"],
+                "kubernetes": ["kubernetes", "k8s"],
+                "postgresql": ["postgresql", "postgres"],
             },
             "unknown": {
-                "python": r"\bpython\b",
-                "fastapi": r"fastapi",
-                "react": r"\breact\b",
-                "java": r"\bjava\b",
+                "python": ["python"],
+                "fastapi": ["fastapi"],
+                "react": ["react"],
+                "java": ["java"],
             },
             "min_tech_score": 0.6,
             "max_years": 5,
@@ -86,15 +95,33 @@ def berlin_profile() -> Profile:
 async def db() -> AsyncIterator[AsyncMongoClient[dict[str, Any]]]:
     """Connects to the throwaway test database and leaves it empty for the test.
 
-    The database is dropped afterwards so a failed run leaves nothing behind.
+    Isolation comes from dropping the collections *before* each test, never from dropping the
+    database after one. A drop is acknowledged before the server has finished it, so against a
+    remote cluster the drop issued for one test can still be landing while the next has begun
+    inserting — deleting that test's data underneath it. It surfaced as documents that a count
+    could see and a query could not, in whichever test happened to be running when the drop caught
+    up, which is why it looked like an unrelated regression.
+
+    The emptying happens before ``init_beanie`` rather than after it, which is not a detail.
+    ``init_beanie`` builds the indexes, one of which is unique on the running sweep, and a unique
+    index cannot be built over a collection that already holds two of them. A test that failed
+    part-way and left two running runs behind would otherwise poison every later run of the whole
+    suite at fixture setup, with an error naming an index rather than the test that caused it.
+
+    Collections are dropped rather than emptied, so an index left renamed or removed by a test is
+    rebuilt from the models instead of persisting into the next one.
     """
+    client: AsyncMongoClient[dict[str, Any]] = AsyncMongoClient(
+        settings.mongodb_uri, tz_aware=True
+    )
+    for name in await client[TEST_DB].list_collection_names():
+        await client[TEST_DB][name].drop()
+    await client.close()
+
     client = await init_db(db_name=TEST_DB)
     try:
-        for model in DOCUMENT_MODELS:
-            await model.get_pymongo_collection().delete_many({})
         yield client
     finally:
-        await client.drop_database(TEST_DB)
         await client.close()
 
 

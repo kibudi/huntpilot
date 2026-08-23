@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ApiError,
   createApplication,
@@ -23,6 +23,7 @@ import {
   sortPostings,
   type PostingSort,
 } from "./components/PostingsTable";
+import { SweepPanel } from "./components/SweepPanel";
 import { Toolbar, type StatusFilter } from "./components/Toolbar";
 import { today } from "./format";
 import type {
@@ -102,9 +103,24 @@ export default function App() {
    *
    * A ref rather than the load state itself: the effect must not re-run when the state it sets
    * changes, or its cleanup would cancel the very request it just started. Cleared on failure, so
-   * leaving the tab and coming back is the retry.
+   * leaving the tab and coming back is the retry — and cleared again when a sweep finishes, since
+   * a completed pass is the one thing that changes the posting set while the page is open.
    */
   const boardRequested = useRef(false);
+
+  /**
+   * Marks the board as needing a fresh read after a sweep has finished.
+   *
+   * Fetching immediately would load a list the user is not looking at, so the postings are simply
+   * dropped and re-read the next time the tab is opened. Without this a user could run a sweep,
+   * watch it report twelve new postings, switch to the board and see none of them until they
+   * reloaded the page — a fetch that was only ever correct while nothing in the app could change
+   * what had been swept.
+   */
+  const boardIsStale = useCallback(() => {
+    boardRequested.current = false;
+    setBoard({ kind: "idle" });
+  }, []);
 
   useEffect(() => {
     if (tab !== "board" || boardRequested.current) return;
@@ -413,14 +429,12 @@ export default function App() {
             </h1>
           </div>
           <p className="mt-1 text-xs text-ink-dim">
-            {tab === "applications"
-              ? "Every application, and what needs chasing."
-              : "Every role the sweep found, and how long it has been open."}
+            {SUBTITLES[tab]}
           </p>
         </div>
 
         <div className="flex gap-7">
-          {tab === "applications" ? (
+          {tab === "sweep" ? null : tab === "applications" ? (
             <>
               <Stat label="Tracked" value={applications.length} />
               <Stat label="Active" value={counts.applied + counts.interview} />
@@ -480,7 +494,7 @@ export default function App() {
             />
           )}
         </>
-      ) : (
+      ) : tab === "board" ? (
         <>
           <BoardToolbar
             query={boardQuery}
@@ -523,6 +537,8 @@ export default function App() {
             />
           )}
         </>
+      ) : (
+        <SweepPanel onSwept={boardIsStale} />
       )}
 
       <AddApplicationDialog
@@ -542,6 +558,18 @@ export default function App() {
 }
 
 /**
+ * The one-line description under the wordmark, per tab.
+ *
+ * A lookup rather than nested ternaries: with three tabs the conditional form stopped being
+ * readable, and a missing entry is now a type error rather than a blank line.
+ */
+const SUBTITLES: Record<Tab, string> = {
+  applications: "Every application, and what needs chasing.",
+  board: "Every role the sweep found, and how long it has been open.",
+  sweep: "Run a pass over the watchlist, and see what the last ones did.",
+};
+
+/**
  * The tab strip.
  *
  * Two buttons and a piece of state, not a router: the tabs are two views of one dashboard, and
@@ -557,6 +585,7 @@ function Tabs({
   const tabs: { id: Tab; label: string }[] = [
     { id: "applications", label: "Applications" },
     { id: "board", label: "Board" },
+    { id: "sweep", label: "Sweep" },
   ];
 
   return (
@@ -604,8 +633,8 @@ function Logo() {
           y2="12"
           gradientUnits="userSpaceOnUse"
         >
-          <stop offset="0" stopColor="#ff7d00" stopOpacity="0.85" />
-          <stop offset="1" stopColor="#ff7d00" stopOpacity="0" />
+          <stop offset="0" stopColor="#2f7d4f" stopOpacity="0.85" />
+          <stop offset="1" stopColor="#2f7d4f" stopOpacity="0" />
         </linearGradient>
       </defs>
       <circle
@@ -620,11 +649,11 @@ function Logo() {
       <path d="M32 32 L32 5 A27 27 0 0 1 55.4 18.5 Z" fill="url(#sweep)" />
       <path
         d="M32 32 L55.4 18.5"
-        stroke="#ff7d00"
+        stroke="#2f7d4f"
         strokeWidth="4"
         strokeLinecap="round"
       />
-      <circle cx="44" cy="24" r="5" fill="#ff7d00" />
+      <circle cx="44" cy="24" r="5" fill="#2f7d4f" />
     </svg>
   );
 }
@@ -658,7 +687,7 @@ function Notice({
   return (
     <div
       className={`rounded-lg border border-line bg-panel px-4 py-10 text-center text-[13px] ${
-        tone === "danger" ? "text-danger" : "text-ink-dim"
+        tone === "danger" ? "text-danger-ink" : "text-ink-dim"
       }`}
     >
       {children}

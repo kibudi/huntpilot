@@ -29,7 +29,7 @@ from collections.abc import Mapping
 
 from pydantic import BaseModel
 
-from app.profile import Profile
+from app.profile import Profile, Terms
 
 YEARS = re.compile(
     r"(\d+)\s*(?:\+|-|–|to)?\s*(?:\d+)?\s*\+?\s*years?(?:\s+of)?"
@@ -70,9 +70,9 @@ class TechMatch(BaseModel):
     """The lowest number of years the posting asks for, or None if it never says."""
 
 
-def _found(vocabulary: Mapping[str, re.Pattern[str]], text: str) -> list[str]:
-    """Returns the vocabulary entries whose pattern appears in the text."""
-    return [name for name, pattern in vocabulary.items() if pattern.search(text)]
+def _found(vocabulary: Mapping[str, Terms], text: str) -> list[str]:
+    """Returns the vocabulary entries one of whose terms appears in the text."""
+    return [name for name, terms in vocabulary.items() if terms.search(text)]
 
 
 def minimum_years(description: str) -> int | None:

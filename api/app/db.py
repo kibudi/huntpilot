@@ -14,9 +14,9 @@ from beanie import init_beanie
 from pymongo import AsyncMongoClient
 
 from app.config import settings
-from app.models import Application, Company, Posting
+from app.models import Application, Company, Posting, SearchProfile, SweepRun
 
-DOCUMENT_MODELS = [Application, Company, Posting]
+DOCUMENT_MODELS = [Application, Company, Posting, SearchProfile, SweepRun]
 
 
 async def init_db(

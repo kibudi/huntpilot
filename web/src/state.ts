@@ -1,7 +1,7 @@
-import type { Application, Posting } from "./types";
+import type { Application, Posting, Profile, SweepRun } from "./types";
 
 /** Which tab the dashboard is showing. */
-export type Tab = "applications" | "board";
+export type Tab = "applications" | "board" | "sweep";
 
 /**
  * The screen's load state.
@@ -77,3 +77,74 @@ export type DialogState =
   | { kind: "submitting" }
   | { kind: "invalid"; message: string }
   | { kind: "failed"; message: string };
+
+/**
+ * Where the sweep panel is in the cycle of starting a pass and watching it.
+ *
+ * A state machine rather than a set of booleans because the UI polls: between asking for a sweep
+ * and seeing it finish there are several distinct waits, and each one shows something different.
+ * Booleans would allow starting-and-finished at once, and every render would have to work out
+ * which of them wins.
+ *
+ * `starting` is the request in flight, before there is a run id to name. `running` begins the
+ * moment the API answers with a run and lasts until a poll reports a final state — the API decides
+ * when it is over, never a timer here.
+ *
+ * `refused` is its own case rather than an error. A 409 means a sweep is already going, most often
+ * the scheduled one, and that is the state the user wanted rather than a failure of theirs; the
+ * next poll turns it into `running` against the pass that was already under way.
+ *
+ * `failed` is the request to start never landing. A sweep that ran and failed is a `finished` run
+ * carrying its own error, because it is a recorded outcome rather than something that went wrong
+ * in the browser.
+ */
+export type SweepState =
+  | { kind: "idle" }
+  | { kind: "starting" }
+  | { kind: "running"; runId: string }
+  | { kind: "refused"; message: string }
+  | { kind: "finished"; run: SweepRun }
+  | { kind: "failed"; message: string };
+
+/**
+ * The sweep history's load state.
+ *
+ * Separate from the run state above because the two answer different questions and fail
+ * independently: the history is worth showing even when a sweep could not be started, and a sweep
+ * is worth watching even on a first load where the history has not arrived yet.
+ */
+export type HistoryState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "error"; message: string }
+  | { kind: "ready"; runs: SweepRun[] };
+
+/**
+ * The profile editor's state.
+ *
+ * `saved` is separate from `ready` so the form can say a write landed without a banner that never
+ * goes away: it carries the same draft and is replaced by `ready` on the next edit.
+ *
+ * `rejected` carries the API's own field errors rather than a single message, because a profile
+ * has sixty patterns in it and "invalid" without naming one is not something a person can act on.
+ * Nothing decides those here — the browser has no copy of the rules and asks the API instead.
+ */
+export type ProfileState =
+  | { kind: "loading" }
+  | { kind: "error"; message: string }
+  | { kind: "ready"; draft: Profile }
+  | { kind: "saving"; draft: Profile }
+  | { kind: "saved"; draft: Profile }
+  | { kind: "rejected"; draft: Profile; errors: FieldError[] };
+
+/**
+ * One complaint from the API about one field.
+ *
+ * `field` is the top-level profile field the API named, which is what the form highlights; `detail`
+ * is the rest of the path plus the message, so a broken pattern says which technology it belongs
+ * to rather than only that the map is wrong.
+ */
+export interface FieldError {
+  field: string;
+  detail: string;
+}

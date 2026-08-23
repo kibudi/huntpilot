@@ -3,21 +3,21 @@
   <desc id="arch-desc">The React dashboard calls the FastAPI service, which owns MongoDB. A Celery worker, scheduled by Beat through Redis, reads three public job board APIs and writes to the same database.</desc>
 
   <style>
-    .box { fill: #fff7ed; stroke: #ff9f17; stroke-width: 1.5; }
-    .ghost { fill: #fff0da; stroke: #ffc574; stroke-width: 1.5; stroke-dasharray: 5 4; }
-    .lbl { fill: #001524; font: 600 15px ui-sans-serif, system-ui, "Segoe UI", sans-serif; }
-    .sub { fill: #15616d; font: 12px ui-monospace, "SF Mono", Menlo, monospace; }
-    .edge { fill: #78290f; font: 11px ui-monospace, "SF Mono", Menlo, monospace; }
-    .flow { stroke: #ff9f17; stroke-width: 1.6; fill: none; marker-end: url(#arrow); }
-    .flow-accent { stroke: #ff7d00; stroke-width: 2.2; fill: none; marker-end: url(#arrow-accent); }
+    .box { fill: #fdfbf2; stroke: #2f7d4f; stroke-width: 1.5; }
+    .ghost { fill: #eae6d4; stroke: #cddcc6; stroke-width: 1.5; stroke-dasharray: 5 4; }
+    .lbl { fill: #1c3a30; font: 600 15px ui-sans-serif, system-ui, "Segoe UI", sans-serif; }
+    .sub { fill: #3d6353; font: 12px ui-monospace, "SF Mono", Menlo, monospace; }
+    .edge { fill: #2b7e7d; font: 11px ui-monospace, "SF Mono", Menlo, monospace; }
+    .flow { stroke: #2f7d4f; stroke-width: 1.6; fill: none; marker-end: url(#arrow); }
+    .flow-accent { stroke: #2f7d4f; stroke-width: 2.2; fill: none; marker-end: url(#arrow-accent); }
   </style>
 
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-      <path d="M0 0 L10 5 L0 10 z" fill="#ff9f17"/>
+      <path d="M0 0 L10 5 L0 10 z" fill="#2f7d4f"/>
     </marker>
     <marker id="arrow-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-      <path d="M0 0 L10 5 L0 10 z" fill="#ff7d00"/>
+      <path d="M0 0 L10 5 L0 10 z" fill="#2f7d4f"/>
     </marker>
   </defs>
 

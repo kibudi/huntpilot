@@ -3,7 +3,9 @@ import type {
   ApplicationCreate,
   Posting,
   PostingStatus,
+  Profile,
   Status,
+  SweepRun,
 } from "./types";
 
 /**
@@ -15,11 +17,20 @@ import type {
  */
 export class ApiError extends Error {
   status: number;
+  /**
+   * FastAPI's `detail` exactly as it arrived, for callers that need more than one sentence.
+   *
+   * The message above is the first complaint flattened for display, which is all most callers
+   * want. A form editing sixty patterns wants all of them, and attached to the right field, so the
+   * raw value is kept rather than reconstructed from the message afterwards.
+   */
+  detail: unknown;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, detail?: unknown) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.detail = detail;
   }
 }
 
@@ -48,7 +59,7 @@ async function send(path: string, init?: RequestInit): Promise<Response> {
         : Array.isArray(detail) && detail[0]?.msg
           ? `${detail[0].loc?.slice(1).join(".") ?? ""} ${detail[0].msg}`.trim()
           : `Request failed (${response.status})`;
-    throw new ApiError(message, response.status);
+    throw new ApiError(message, response.status, detail);
   }
 
   return response;
@@ -109,4 +120,57 @@ export function updateApplication(
  */
 export async function deleteApplication(id: string): Promise<void> {
   await send(`/api/applications/${id}`, { method: "DELETE" });
+}
+
+/**
+ * Starts one sweep of the watchlist.
+ *
+ * Answers as soon as the run is recorded, not when the pass is over — a sweep reads a few dozen
+ * boards and takes minutes. The run comes back in its running state with no summary, which is what
+ * gives the panel something to poll for from the first moment.
+ *
+ * A 409 is left to the caller to interpret rather than treated as a failure here: it means a sweep
+ * is already going, which is the state the user asked for.
+ */
+export function startSweep(): Promise<SweepRun> {
+  return request<SweepRun>("/api/sweeps", { method: "POST" });
+}
+
+/**
+ * Returns every recorded sweep, most recently started first.
+ *
+ * The whole history rather than a page of it, because sweeps run four times a day and the list is
+ * a few hundred small records a year. It is also how the panel watches a running sweep: the run
+ * being polled is the first entry.
+ */
+export function fetchSweeps(): Promise<SweepRun[]> {
+  return request<SweepRun[]>("/api/sweeps");
+}
+
+/**
+ * Returns the search every sweep is currently run against.
+ *
+ * Never a 404: a database that has never been swept still answers, because the committed file
+ * seeds one on first read. An editor that could not load until something had saved a profile would
+ * have no way to save the first one.
+ */
+export function fetchProfile(): Promise<Profile> {
+  return request<Profile>("/api/profile");
+}
+
+/**
+ * Replaces the stored search profile and returns it as stored.
+ *
+ * A replacement rather than a patch, because the fields are not independent — which families are
+ * tried in which order, and which technologies count as known against which count as unknown, only
+ * mean anything as a set.
+ *
+ * What comes back is the normalised profile rather than an echo, so the caller can show what the
+ * filters will actually use instead of what was typed.
+ */
+export function saveProfile(profile: Profile): Promise<Profile> {
+  return request<Profile>("/api/profile", {
+    method: "PUT",
+    body: JSON.stringify(profile),
+  });
 }

@@ -14,8 +14,8 @@ import pytest
 from pymongo import AsyncMongoClient
 
 from app.boards import BOARD_URLS
-from app.models import ATS, Company, Posting, PostingStatus
-from app.sweep import SweepSummary, sweep
+from app.models import ATS, Company, Posting, PostingStatus, SweepSummary
+from app.sweep import sweep
 from app.worker import SWEEP_INTERVAL, celery_app, sweep_boards
 
 MATCHING_DESCRIPTION = "We build with Python, FastAPI and MongoDB. 2 years of experience."

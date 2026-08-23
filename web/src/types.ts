@@ -38,19 +38,37 @@ export const STATUSES: Status[] = [
 ];
 
 /**
- * Chroma and hue per status, used to build both the pill background and its text colour.
+ * Lightness, chroma and hue per status, used to build both the pill background and its text.
  *
  * Deriving both from one pattern keeps the six pills visually consistent; picking each colour by
  * hand does not.
+ *
+ * The early pipeline is one hue getting stronger. Saved is barely tinted, applied and interview
+ * are the same green with more chroma and less light, so the first three read as one ramp rather
+ * than three unrelated badges — the eye follows a column of them down a table without having to
+ * decode a legend.
+ *
+ * Offer ends that ramp by crossing into light text on a deep green. A reversal is visible at a
+ * glance in a way a fourth step of the same ramp would not be, and an offer is the one row worth
+ * spotting in a full table.
+ *
+ * Rejected is the product's raspberry, the only hue here that is not green. It is spent on nothing
+ * else, so red on this screen always means the same thing — which is what the previous palette
+ * could not do, having no warm colour and no choice but to spell a rejection as darkness.
+ *
+ * Ghosted keeps no chroma at all, because no answer is not an outcome.
  */
-export const STATUS_COLOR: Record<Status, { c: number; h: number }> = {
-  saved: { c: 0.03, h: 70 },
-  applied: { c: 0.07, h: 210 },
-  interview: { c: 0.1, h: 195 },
-  offer: { c: 0.12, h: 165 },
-  rejected: { c: 0.1, h: 35 },
-  ghosted: { c: 0, h: 0 },
+export const STATUS_COLOR: Record<Status, { l: number; c: number; h: number }> = {
+  saved: { l: 0.95, c: 0.02, h: 110 },
+  applied: { l: 0.9, c: 0.05, h: 150 },
+  interview: { l: 0.82, c: 0.09, h: 152 },
+  offer: { l: 0.52, c: 0.13, h: 152 },
+  rejected: { l: 0.87, c: 0.08, h: 18 },
+  ghosted: { l: 0.91, c: 0, h: 0 },
 };
+
+/** Below this lightness a pill needs light text on it rather than dark. */
+export const PILL_FLIP = 0.55;
 
 /**
  * A job posting the board tracker swept from a company's job board, as the API returns it.
@@ -115,4 +133,87 @@ export interface ApplicationCreate {
   status?: Status;
   applied_date?: string | null;
   notes?: string;
+}
+
+/**
+ * One recorded pass over the watchlist, as the API returns it.
+ *
+ * Field names match the backend exactly. Nothing here is editable: a run is a record of something
+ * that happened, and the dashboard's only writes are starting one.
+ */
+export interface SweepRun {
+  id: string;
+  state: SweepState;
+  /** ISO timestamp of the moment the run was recorded, before the first board was read. */
+  started_at: string;
+  /** ISO timestamp of the moment it reached a final state, or null while it is still going. */
+  finished_at: string | null;
+  /** Null until the pass is over — a sweep on its first board and one that stored nothing differ. */
+  summary: SweepSummary | null;
+  /** Why the sweep as a whole failed, which is not the same as a board failing. */
+  error: string | null;
+}
+
+/**
+ * Where one recorded sweep got to.
+ *
+ * `completed` covers a pass in which individual boards failed: that is contained by design and
+ * already counted in the summary, so it is not a separate outcome.
+ */
+export type SweepState = "running" | "completed" | "failed" | "abandoned";
+
+/**
+ * What one pass did, as the API returns it.
+ *
+ * The posting counts are totals across the boards that were actually read, which is why
+ * `boards_failed` is shown beside them and never on its own: a sweep where half the boards failed
+ * produces small, honest-looking counts, and only the failure count says the sweep saw half the
+ * market.
+ */
+export interface SweepSummary {
+  boards_swept: number;
+  boards_failed: number;
+  added: number;
+  still_open: number;
+  closed: number;
+  reopened: number;
+  failures: BoardFailure[];
+}
+
+/** One board that could not be read during a sweep, and why. */
+export interface BoardFailure {
+  name: string;
+  ats: Ats;
+  token: string;
+  error: string;
+}
+
+/**
+ * The search every sweep is run against, as the API returns it and accepts it back.
+ *
+ * One interface for both directions because the API publishes one shape for both, which is what
+ * makes the editor work: it is filled from a `GET` and posted back to a `PUT`, so a field present
+ * in one direction and absent in the other would be a trap.
+ *
+ * Every vocabulary is a list of plain words. The boundaries that stop a short word matching inside
+ * a longer one are added by the API when it compiles the list — the browser does not filter
+ * anything, and nothing here needs to know what a word boundary is.
+ */
+export interface Profile {
+  /** City and district spellings that count as local. Matched against lower-cased text. */
+  local_fragments: string[];
+  /** Wordings that count as advertised remote. */
+  remote_fragments: string[];
+  /** Words whose appearance in a title rules the posting out as too senior. */
+  seniority_markers: string[];
+  /** Role family name to the words that recognise it, tried in the order given. */
+  role_families: Record<string, string[]>;
+  /** Technology name to the words that recognise it, for technologies already known. */
+  known: Record<string, string[]>;
+  /** The same, for technologies counted against a posting rather than for it. */
+  unknown: Record<string, string[]>;
+  /** Share of a posting's named technologies that must be known, as a fraction of one. */
+  min_tech_score: number;
+  /** The most years of experience a posting may ask for and still be kept. */
+  max_years: number;
 }
