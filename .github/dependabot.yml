@@ -1,0 +1,38 @@
+# Automated dependency updates.
+#
+# Every well-maintained project this one takes its shape from runs either this or Renovate. The
+# reason is the same one that produced this file: the actions in ci.yml had drifted three to five
+# major versions behind, and nothing in the repository was going to notice.
+#
+# Updates are grouped per ecosystem and run monthly rather than weekly. A solo project does not
+# have the review budget for a PR per package, and an ungrouped weekly schedule produces exactly
+# the flood of pull requests that trains a maintainer to ignore them.
+#
+# Since main requires a pull request with both CI jobs green, a Dependabot PR that breaks the
+# build cannot merge itself — the bump is proven before it lands.
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: uv
+    directory: /api
+    schedule:
+      interval: monthly
+    groups:
+      python:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: monthly
+    groups:
+      frontend:
+        patterns: ["*"]
