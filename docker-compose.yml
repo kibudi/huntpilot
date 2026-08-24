@@ -72,3 +72,36 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+
+  # Scheduling and delivery for alerts, kept out of the application.
+  #
+  # The split is deliberate: the API decides what is true — which applications have gone quiet,
+  # which postings are new — and n8n only decides when to ask and where to send the answer. Putting
+  # the "14 days without a reply" rule in a workflow node would be a second copy of business logic
+  # living somewhere untested, which is the same reason the dashboard does no filtering.
+  #
+  # It reaches the API at http://api:8000 over the compose network, so nothing is exposed to the
+  # internet and no credential leaves this machine. Self-hosted n8n is free; this adds no cost.
+  #
+  # N8N_SECURE_COOKIE is off because the editor is served over plain http on localhost, and n8n
+  # otherwise refuses to set its session cookie and shows a blank login.
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    ports:
+      - "5678:5678"
+    environment:
+      N8N_SECURE_COOKIE: "false"
+      N8N_RUNNERS_ENABLED: "true"
+      GENERIC_TIMEZONE: Asia/Jerusalem
+      TZ: Asia/Jerusalem
+      HUNTPILOT_API: http://api:8000
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      api:
+        condition: service_healthy
+
+# Workflows and credentials live here rather than in the image, so `docker compose down` does not
+# delete them. Removing this volume loses every workflow built in the editor.
+volumes:
+  n8n_data:
