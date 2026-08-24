@@ -1,0 +1,109 @@
+{
+  "name": "huntpilot \u2014 new postings",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "sched",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://api:8000/api/postings?status=open",
+        "options": {}
+      },
+      "id": "Get_postings",
+      "name": "Get postings",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// New postings, run just after each sweep. Applying inside 72 hours is the biggest lever a\n// cold application has, and the window here is deliberately wider than the schedule: an\n// occasional repeat is a smaller cost than silently missing the one that mattered.\nconst WINDOW_HOURS = 7;\nconst postings = items.map(i => i.json);\nconst cutoff = Date.now() - WINDOW_HOURS * 3600000;\n\nconst fresh = postings.filter(p =>\n  p.status === 'open' && p.first_seen_at && new Date(p.first_seen_at).getTime() >= cutoff\n);\nif (!fresh.length) return [];\n\nconst lines = fresh.slice(0, 20).map(p => `\u2022 **${p.company}** \u2014 ${p.title} \u00b7 ${p.location}\\n<${p.url}>`);\nconst content = [`**${fresh.length} new posting${fresh.length > 1 ? 's' : ''}**`, ...lines].join('\\n');\n\nreturn [{ json: { content } }];"
+      },
+      "id": "decide",
+      "name": "Decide",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://discord.com/api/webhooks/REPLACE_WITH_YOUR_WEBHOOK",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: $json.content }) }}",
+        "options": {}
+      },
+      "id": "discord",
+      "name": "Post to Discord",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Get postings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get postings": {
+      "main": [
+        [
+          {
+            "node": "Decide",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide": {
+      "main": [
+        [
+          {
+            "node": "Post to Discord",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

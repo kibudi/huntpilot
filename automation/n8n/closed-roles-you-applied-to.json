@@ -1,0 +1,134 @@
+{
+  "name": "huntpilot \u2014 closed roles you applied to",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "sched",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://api:8000/api/applications",
+        "options": {}
+      },
+      "id": "Get_applications",
+      "name": "Get applications",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://api:8000/api/postings?status=closed",
+        "options": {}
+      },
+      "id": "Get_closed_postings",
+      "name": "Get closed postings",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// A role you applied to has come off its board. This is the whole reason the project exists:\n// no board announces a filled role, so without this you keep waiting on something that ended.\n// Matching is by URL, which is the only field both sides genuinely share.\nconst closed = items.map(i => i.json).filter(p => p.status === 'closed');\nconst apps = $('Get applications').all().map(i => i.json);\n\nconst norm = u => (u || '').trim().replace(/\\/+$/, '').toLowerCase();\nconst appliedTo = new Map();\nfor (const a of apps) {\n  if (a.url && a.status === 'applied') appliedTo.set(norm(a.url), a);\n}\n\nconst hits = [];\nfor (const p of closed) {\n  const a = appliedTo.get(norm(p.url));\n  if (a) hits.push({ company: a.company, role: a.role, closed_at: p.closed_at });\n}\nif (!hits.length) return [];\n\nconst lines = hits.map(h => `\u2022 **${h.company}** \u2014 ${h.role}`);\nconst content = [\n  `**${hits.length} role${hits.length > 1 ? 's' : ''} you applied to closed**`,\n  ...lines,\n  '_Stop waiting on these._',\n].join('\\n');\n\nreturn [{ json: { content } }];"
+      },
+      "id": "decide",
+      "name": "Decide",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://discord.com/api/webhooks/REPLACE_WITH_YOUR_WEBHOOK",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: $json.content }) }}",
+        "options": {}
+      },
+      "id": "discord",
+      "name": "Post to Discord",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Get applications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get applications": {
+      "main": [
+        [
+          {
+            "node": "Get closed postings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get closed postings": {
+      "main": [
+        [
+          {
+            "node": "Decide",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide": {
+      "main": [
+        [
+          {
+            "node": "Post to Discord",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

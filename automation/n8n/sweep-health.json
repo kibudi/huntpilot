@@ -1,0 +1,109 @@
+{
+  "name": "huntpilot \u2014 sweep health",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 10
+            }
+          ]
+        }
+      },
+      "id": "sched",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://api:8000/api/sweeps",
+        "options": {}
+      },
+      "id": "Get_sweeps",
+      "name": "Get sweeps",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sweep health. A broken board token and a quiet market look identical from the dashboard,\n// and a scheduled job nobody watches is one nobody notices failing. Silent when healthy.\nconst sweeps = items.map(i => i.json);\nif (!sweeps.length) return [{ json: { content: '**huntpilot: no sweeps recorded at all.**' } }];\n\nconst latest = sweeps[0];\nconst started = new Date(latest.started_at).getTime();\nconst hours = (Date.now() - started) / 3600000;\nconst s = latest.summary || {};\nconst problems = [];\n\nif (latest.state === 'failed') problems.push(`last sweep **failed**: ${latest.error || 'no reason recorded'}`);\nif (latest.state === 'abandoned') problems.push('last sweep was **abandoned** \u2014 the worker died mid-run');\nif (latest.state === 'running' && hours > 1) problems.push(`a sweep has been running for ${hours.toFixed(1)}h`);\nif (hours > 13) problems.push(`no sweep for **${hours.toFixed(1)}h** \u2014 Beat runs every 6h, so it is not scheduling`);\nif ((s.boards_failed || 0) > 0) problems.push(`**${s.boards_failed} board(s) failed** to load \u2014 likely a stale token`);\n\nif (!problems.length) return [];\nreturn [{ json: { content: ['**huntpilot sweep problem**', ...problems.map(p => `\u2022 ${p}`)].join('\\n') } }];"
+      },
+      "id": "decide",
+      "name": "Decide",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://discord.com/api/webhooks/REPLACE_WITH_YOUR_WEBHOOK",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: $json.content }) }}",
+        "options": {}
+      },
+      "id": "discord",
+      "name": "Post to Discord",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Get sweeps",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get sweeps": {
+      "main": [
+        [
+          {
+            "node": "Decide",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide": {
+      "main": [
+        [
+          {
+            "node": "Post to Discord",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

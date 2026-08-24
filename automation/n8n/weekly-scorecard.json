@@ -1,0 +1,112 @@
+{
+  "name": "huntpilot \u2014 weekly scorecard",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                0
+              ],
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "id": "sched",
+      "name": "Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://api:8000/api/applications",
+        "options": {}
+      },
+      "id": "Get_applications",
+      "name": "Get applications",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Weekly scorecard. Answers the question the log exists to answer: is the volume there,\n// and is any of it warm? Sent even when the week was empty, because an empty week is the\n// single most useful thing this can tell you.\nconst apps = items.map(i => i.json);\nconst now = Date.now();\nconst DAY = 86400000;\n\nconst age = a => (now - new Date(a.applied_date).getTime()) / DAY;\nconst thisWeek = apps.filter(a => a.applied_date && age(a) <= 7);\n\nconst warm = a => /referral|network|friend|colleague/i.test(a.source || '');\nconst referrals = thisWeek.filter(warm).length;\n\nconst quiet = apps.filter(a => a.status === 'applied' && a.applied_date && age(a) >= 14).length;\nconst replied = apps.filter(a => a.status !== 'applied' && a.status !== 'saved').length;\nconst rate = apps.length ? ((replied / apps.length) * 100).toFixed(1) : '0.0';\n\nconst bySource = {};\nfor (const a of thisWeek) bySource[a.source || '\u2014'] = (bySource[a.source || '\u2014'] || 0) + 1;\nconst sources = Object.entries(bySource)\n  .sort((a, b) => b[1] - a[1])\n  .map(([s, n]) => `${s} ${n}`)\n  .join(' \u00b7 ') || 'none';\n\nconst verdict =\n  thisWeek.length === 0 ? '**No applications this week.**'\n  : thisWeek.length < 10 ? `**${thisWeek.length} this week** \u2014 cold applications need ~25/week to produce interviews.`\n  : `**${thisWeek.length} this week** \u2014 that is the right volume.`;\n\nconst referralNote =\n  referrals === 0 ? '**0 referrals.** Cold converts at 2\u20135%, referred at 20\u201350%. This is the gap.'\n  : `${referrals} referral${referrals > 1 ? 's' : ''} this week.`;\n\nconst content = [\n  '**Weekly scorecard**',\n  verdict,\n  referralNote,\n  `Sources: ${sources}`,\n  `Total tracked: ${apps.length} \u00b7 replied: ${replied} (${rate}%) \u00b7 silent 14d+: ${quiet}`,\n].join('\\n');\n\nreturn [{ json: { content } }];"
+      },
+      "id": "decide",
+      "name": "Decide",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://discord.com/api/webhooks/REPLACE_WITH_YOUR_WEBHOOK",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ content: $json.content }) }}",
+        "options": {}
+      },
+      "id": "discord",
+      "name": "Post to Discord",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule": {
+      "main": [
+        [
+          {
+            "node": "Get applications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get applications": {
+      "main": [
+        [
+          {
+            "node": "Decide",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide": {
+      "main": [
+        [
+          {
+            "node": "Post to Discord",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
