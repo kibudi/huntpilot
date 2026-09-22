@@ -16,7 +16,9 @@ from huntpilot_mcp import (
     fetch_applications,
     list_applications,
     log_application,
+    patch_status,
     post_application,
+    update_status,
 )
 
 APPLICATIONS = [
@@ -112,3 +114,30 @@ async def test_a_duplicate_url_says_the_job_is_already_tracked() -> None:
 async def test_unknown_status_is_rejected_before_writing_anything() -> None:
     with pytest.raises(ToolError, match="unknown status"):
         await log_application(**JOB, status="hired")
+
+
+async def test_a_status_change_sends_only_the_status() -> None:
+    """Guards the PATCH contract: notes, dates and the link must survive a status change."""
+    sent: list[dict[str, object]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        sent.append(json.loads(request.content))
+        return httpx.Response(200, json={"id": "9", **JOB, "status": "ghosted"})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        await patch_status("9", "ghosted", client)
+    assert sent[0] == {"status": "ghosted"}
+
+
+async def test_an_unknown_id_says_to_list_applications_first() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404, json={"detail": "Application not found"})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(ToolError, match="no application has id"):
+            await patch_status("nope", "ghosted", client)
+
+
+async def test_an_unknown_status_is_rejected_before_overwriting_anything() -> None:
+    with pytest.raises(ToolError, match="unknown status"):
+        await update_status("9", "hired")

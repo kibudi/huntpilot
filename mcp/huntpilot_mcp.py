@@ -134,6 +134,54 @@ async def log_application(
     async with httpx.AsyncClient(timeout=10.0) as client:
         return await post_application(payload, client)
 
+async def patch_status(
+    application_id: str,
+    status: str,
+    client: httpx.AsyncClient,
+) -> dict[str, Any]:
+    """Moves one application to a new pipeline status and returns it as stored.
+
+    Only ``status`` is sent. A PATCH writes just the fields present in the body, so every other
+    field — notes, dates, the posting link — is left untouched by construction rather than by
+    resending values this tool never read.
+
+    A 404 is translated because it is the likely mistake: an identifier copied from an older
+    listing, or invented. The message says so rather than reporting the bare status code.
+    """
+    try:
+        response = await client.patch(
+            f"{API_BASE_URL}/api/applications/{application_id}", json={"status": status}
+        )
+    except httpx.ConnectError as error:
+        raise ToolError(
+            f"the huntpilot API is not reachable at {API_BASE_URL} - is it running?"
+        ) from error
+    if response.status_code == HTTPStatus.NOT_FOUND:
+        raise ToolError(
+            f"no application has id {application_id!r}; list them first and use an id from that"
+        )
+    if response.status_code != HTTPStatus.OK:
+        raise ToolError(f"huntpilot rejected the change ({response.status_code}): {response.text}")
+    updated: dict[str, Any] = response.json()
+    return updated
+
+
+@server.tool(annotations=ToolAnnotations(read_only_hint=False, destructive_hint=True))
+async def update_status(application_id: str, status: str) -> dict[str, Any]:
+    """Move one tracked application to a different pipeline status.
+
+    Use this to record that a job progressed or ended: saved, applied, interview, offer,
+    rejected or ghosted. Ghosted means applied but never answered.
+
+    The id is the one huntpilot assigned, as returned by list_applications. Nothing else about
+    the application is changed. The previous status is overwritten and not recoverable, so
+    confirm which application is meant before calling this on several at once.
+    """
+    if status not in STATUSES:
+        raise ToolError(f"unknown status {status!r}; expected one of {', '.join(STATUSES)}")
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        return await patch_status(application_id, status, client)
+
 def main() -> None:
     """Runs the server over stdio, the transport Claude Code launches it with."""
     server.run()
