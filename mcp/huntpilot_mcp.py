@@ -5,6 +5,12 @@ sole owner of the database and its validation still applies to anything this ser
 The cost is that huntpilot must be running when a tool is called; the benefit is that the two
 can never disagree about what an application is.
 
+Every failure a caller could act on is raised as ``ToolError``. It is the only exception whose
+message reaches the caller: the SDK replaces anything else with a generic "error executing
+tool", which says that something broke but not what, and leaves a model with nothing to retry
+or report. Unreachable backends, unknown identifiers and rejected values are all translated
+here for that reason.
+
 The module is named ``huntpilot_mcp`` rather than ``mcp`` so that it cannot shadow the SDK
 package of that name when this directory ends up on ``sys.path``.
 """
@@ -19,8 +25,42 @@ from mcp.types import ToolAnnotations
 
 API_BASE_URL: Final = "http://localhost:8000"
 STATUSES: Final = ("saved", "applied", "interview", "offer", "rejected", "ghosted")
+REQUEST_TIMEOUT: Final = 10.0
 
 server = MCPServer("huntpilot")
+
+
+async def send(
+    client: httpx.AsyncClient,
+    method: str,
+    path: str,
+    json: dict[str, Any] | None = None,
+) -> httpx.Response:
+    """Makes one request to the API, translating any transport failure into ``ToolError``.
+
+    ``httpx.TransportError`` is caught rather than ``ConnectError`` alone: a backend that
+    accepts the socket and then stalls, mid-startup or blocked on its database, raises a
+    timeout instead, which is not a ``ConnectError`` and would otherwise escape as the generic
+    message this module exists to avoid. Both mean the same thing to the caller.
+
+    The response is returned unexamined. Which status codes are expected differs per endpoint,
+    so each caller interprets its own.
+    """
+    try:
+        return await client.request(method, f"{API_BASE_URL}{path}", json=json)
+    except httpx.TransportError as error:
+        raise ToolError(
+            f"the huntpilot API is not reachable at {API_BASE_URL} - is it running?"
+        ) from error
+
+
+def reject(action: str, response: httpx.Response) -> ToolError:
+    """Builds the error for a status code no caller expected, keeping the API's own message.
+
+    The body is included because it carries the API's validation detail, which names the field
+    at fault; the status code alone would send a caller looking in the wrong place.
+    """
+    return ToolError(f"huntpilot rejected the {action} ({response.status_code}): {response.text}")
 
 
 async def fetch_applications(
@@ -35,18 +75,10 @@ async def fetch_applications(
 
     The client is passed in rather than created here so tests can supply a mock transport
     instead of requiring a running backend.
-
-    A refused connection is re-raised as ``ToolError`` naming the address, because that is the
-    expected failure of this design — the backend owns the data and may simply be down — and
-    the SDK replaces any other exception with a generic message the caller cannot act on.
     """
-    try:
-        response = await client.get(f"{API_BASE_URL}/api/applications")
-    except httpx.ConnectError as error:
-        raise ToolError(
-            f"the huntpilot API is not reachable at {API_BASE_URL} - is it running?"
-        ) from error
-    response.raise_for_status()
+    response = await send(client, "GET", "/api/applications")
+    if response.status_code != HTTPStatus.OK:
+        raise reject("request", response)
     applications: list[dict[str, Any]] = response.json()
     if status is None:
         return applications
@@ -62,13 +94,10 @@ async def list_applications(status: str | None = None) -> list[dict[str, Any]]:
 
     The docstring is the tool description the model reads when deciding whether to call this,
     so it names the valid statuses instead of leaving them to be guessed.
-
-    Failures are raised as ``ToolError`` for the same reason: the message is what the caller
-    reads, so it has to say what went wrong rather than that something did.
     """
     if status is not None and status not in STATUSES:
         raise ToolError(f"unknown status {status!r}; expected one of {', '.join(STATUSES)}")
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
         return await fetch_applications(status, client)
 
 
@@ -79,22 +108,16 @@ async def post_application(
     """Creates one application through the API and returns it as stored.
 
     The 409 the API raises on a duplicate url is translated rather than passed through, because
-    it is the expected outcome of asking twice about the same job and the caller can act on it.
-    Any other error status is reported with its body, which carries the API's own validation
-    message.
+    it is the expected outcome of asking twice about the same job: the caller should stop rather
+    than retry, which a bare status code does not say.
 
     Like ``fetch_applications``, the client is a parameter so tests need no running backend.
     """
-    try:
-        response = await client.post(f"{API_BASE_URL}/api/applications", json=payload)
-    except httpx.ConnectError as error:
-        raise ToolError(
-            f"the huntpilot API is not reachable at {API_BASE_URL} - is it running?"
-        ) from error
+    response = await send(client, "POST", "/api/applications", json=payload)
     if response.status_code == HTTPStatus.CONFLICT:
         raise ToolError(f"this job is already tracked: {payload['url']}")
     if response.status_code != HTTPStatus.CREATED:
-        raise ToolError(f"huntpilot rejected the application ({response.status_code}): {response.text}")
+        raise reject("application", response)
     created: dict[str, Any] = response.json()
     return created
 
@@ -131,8 +154,9 @@ async def log_application(
         "status": status,
         "notes": notes,
     }
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
         return await post_application(payload, client)
+
 
 async def patch_status(
     application_id: str,
@@ -142,26 +166,25 @@ async def patch_status(
     """Moves one application to a new pipeline status and returns it as stored.
 
     Only ``status`` is sent. A PATCH writes just the fields present in the body, so every other
-    field — notes, dates, the posting link — is left untouched by construction rather than by
-    resending values this tool never read.
+    field, including notes, dates and the posting link, is left untouched by construction rather
+    than by resending values this tool never read.
 
-    A 404 is translated because it is the likely mistake: an identifier copied from an older
-    listing, or invented. The message says so rather than reporting the bare status code.
+    Both ways of naming the wrong application get the same answer. The API declares the path
+    parameter as an ``ObjectId``, so an invented identifier fails its validation with a 422
+    before the handler runs, while a well-formed one that no longer exists reaches the handler
+    and returns 404. A caller that guessed an id cannot tell those apart and does not need to:
+    either way the fix is to list the applications and use an id from that.
     """
-    try:
-        response = await client.patch(
-            f"{API_BASE_URL}/api/applications/{application_id}", json={"status": status}
-        )
-    except httpx.ConnectError as error:
+    response = await send(
+        client, "PATCH", f"/api/applications/{application_id}", json={"status": status}
+    )
+    if response.status_code in (HTTPStatus.NOT_FOUND, HTTPStatus.UNPROCESSABLE_ENTITY):
         raise ToolError(
-            f"the huntpilot API is not reachable at {API_BASE_URL} - is it running?"
-        ) from error
-    if response.status_code == HTTPStatus.NOT_FOUND:
-        raise ToolError(
-            f"no application has id {application_id!r}; list them first and use an id from that"
+            f"no application has id {application_id!r}; "
+            "list the applications first and use an id from that"
         )
     if response.status_code != HTTPStatus.OK:
-        raise ToolError(f"huntpilot rejected the change ({response.status_code}): {response.text}")
+        raise reject("change", response)
     updated: dict[str, Any] = response.json()
     return updated
 
@@ -179,8 +202,9 @@ async def update_status(application_id: str, status: str) -> dict[str, Any]:
     """
     if status not in STATUSES:
         raise ToolError(f"unknown status {status!r}; expected one of {', '.join(STATUSES)}")
-    async with httpx.AsyncClient(timeout=10.0) as client:
+    async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
         return await patch_status(application_id, status, client)
+
 
 def main() -> None:
     """Runs the server over stdio, the transport Claude Code launches it with."""
