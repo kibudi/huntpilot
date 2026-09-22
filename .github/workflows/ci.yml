@@ -57,6 +57,36 @@ jobs:
       - name: Test
         run: uv run pytest -q
 
+  mcp:
+    name: mcp — ruff, mypy, pytest
+    runs-on: ubuntu-latest
+
+    # No database service: the MCP server reaches its data over the API, and the suite replaces
+    # that API with an httpx.MockTransport, so nothing here needs a backend or a mongod.
+    defaults:
+      run:
+        working-directory: mcp
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --all-extras --dev
+
+      - name: Lint
+        run: uv run ruff check huntpilot_mcp.py tests
+
+      - name: Type check
+        run: uv run mypy huntpilot_mcp.py tests
+
+      - name: Test
+        run: uv run pytest -q
+
   web:
     name: web — lint, build
     runs-on: ubuntu-latest

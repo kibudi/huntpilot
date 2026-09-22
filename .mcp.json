@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "huntpilot": {
+      "command": "uv",
+      "args": ["run", "--directory", "mcp", "python", "huntpilot_mcp.py"]
+    }
+  }
+}
